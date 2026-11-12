@@ -189,3 +189,9 @@ func TestTextReport(t *testing.T) {
 		t.Errorf("an empty day should say so:\n%s", out)
 	}
 }
+
+func TestInteractiveNeedsATerminal(t *testing.T) {
+	if _, _, err := execute(t, nil, "-i"); !IsUsage(err) {
+		t.Errorf("-i without a terminal: got %v", err)
+	}
+}

@@ -18,6 +18,7 @@ import (
 	"github.com/karnull/tmux-telemetry/internal/record"
 	"github.com/karnull/tmux-telemetry/internal/render"
 	"github.com/karnull/tmux-telemetry/internal/sheet"
+	"github.com/karnull/tmux-telemetry/internal/tui"
 )
 
 // UsageError is a mistake in how timesheet was called, which exits with status 2.
@@ -63,9 +64,10 @@ type options struct {
 	dayStart, lunch string
 	dir             string
 
-	format    string
-	color     string
-	timetable bool
+	format      string
+	color       string
+	timetable   bool
+	interactive bool
 }
 
 // Env is what the command reads from outside its flags, so tests can stand in for it.
@@ -128,6 +130,9 @@ timesheet -pm
 # a range of days
 timesheet -s 2026-11-01 -u 2026-11-15
 
+# browse in the terminal
+timesheet -i
+
 # the previous month for a spreadsheet
 timesheet -pm -f csv > november.csv`,
 		Args: func(_ *cobra.Command, args []string) error {
@@ -165,6 +170,7 @@ timesheet -pm -f csv > november.csv`,
 	f.StringVar(&opts.color, "color", "auto", "same as --colour")
 	_ = f.MarkHidden("color")
 	f.BoolVarP(&opts.timetable, "timetable", "t", false, "add each day's timetable to the text report")
+	f.BoolVarP(&opts.interactive, "interactive", "i", false, "browse the report in the terminal")
 
 	return cmd
 }
@@ -301,7 +307,12 @@ func width(w io.Writer, env Env) int {
 	return 80
 }
 
-func run(_ *cobra.Command, env Env, opts options) error {
+func isTerminal(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	return ok && term.IsTerminal(f.Fd())
+}
+
+func run(cmd *cobra.Command, env Env, opts options) error {
 	p, err := opts.resolve(record.DateOf(env.Now()))
 	if err != nil {
 		return err
@@ -317,6 +328,16 @@ func run(_ *cobra.Command, env Env, opts options) error {
 	dir := opts.dir
 	if dir == "" {
 		dir = record.Dir()
+	}
+
+	if opts.interactive {
+		if opts.format != "text" {
+			return usagef("--interactive shows the report itself, so it can't be used with --format")
+		}
+		if !isTerminal(env.Stdout) || !isTerminal(os.Stdin) {
+			return usagef("--interactive needs a terminal")
+		}
+		return tui.Run(cmd.Context(), tui.Config{Dir: dir, Period: p, Rules: rules, Now: env.Now})
 	}
 
 	loaded, err := record.Load(dir, p.First, p.Last)
