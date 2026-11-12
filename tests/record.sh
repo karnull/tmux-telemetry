@@ -11,9 +11,10 @@ trap 'tmux kill-server 2>/dev/null; wait; rm -rf "$SCRATCH"' EXIT
 unset TMUX
 export TMUX_TMPDIR="$SCRATCH" TELEMETRY_DIR="$SCRATCH/logs" TERM=xterm-256color
 export ZDOTDIR="$SCRATCH/zsh" SHELL=zsh
-mkdir -p "$ZDOTDIR" "$SCRATCH/repo" "$SCRATCH/plain"
+mkdir -p "$ZDOTDIR" "$SCRATCH/repo" "$SCRATCH/plain" "$SCRATCH/Widget"
 echo 'source "$TELEMETRY_HOME/telemetry.zsh"' > "$ZDOTDIR/.zshrc"
 git -C "$SCRATCH/repo" init -q -b feat/test
+git -C "$SCRATCH/Widget" init -q -b main
 
 # the plugin loads before any shell starts, as it does from a tmux config
 tmux -f /dev/null new-session -d -s setup
@@ -45,6 +46,7 @@ attach Work; sleep 2
 step send -t Other 'true' Enter
 step switch-client -c "$(tmux list-clients -F '#{client_name}' | head -n 1)" -t Other
 step send -t Other 'cd /' Enter
+step send -t Other "cd $SCRATCH/Widget" Enter
 attach popup; sleep 2
 step send -t popup 'true' Enter
 step detach-client -s popup
@@ -57,6 +59,7 @@ expected=$(printf '%s\n' \
     'focus,Work,feat/test' \
     "focus,Other,$SCRATCH/plain" \
     'focus,Other,/' \
+    'focus,Other,Widget' \
     'focus,Work,feat/test' \
     'away,,')
 

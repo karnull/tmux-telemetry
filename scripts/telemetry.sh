@@ -63,15 +63,19 @@ append() {
 
 # only the pane in focus counts, so background panes finishing a command don't
 record_pane() {
-    local active session path ignore context
-    IFS=$'\t' read -r active session path ignore < <(tmux display-message -p -t "$1" \
-        '#{&&:#{session_attached},#{&&:#{window_active},#{pane_active}}}	#{session_name}	#{pane_current_path}	#{@telemetry-ignore}')
+    local active session path ignore trunk context
+    IFS=$'\t' read -r active session path ignore trunk < <(tmux display-message -p -t "$1" \
+        '#{&&:#{session_attached},#{&&:#{window_active},#{pane_active}}}	#{session_name}	#{pane_current_path}	#{@telemetry-ignore}	#{@telemetry-trunk}')
 
     [[ "$active" == 1 && -n "$session" && " $ignore " != *" $session "* ]] || return 0
 
-    context=$(git -C "$path" symbolic-ref --short -q HEAD 2>/dev/null) ||
+    # the trunk branch says nothing about the work, so its folder name stands in
+    if context=$(git -C "$path" symbolic-ref --short -q HEAD 2>/dev/null); then
+        [[ " ${trunk:-main master} " == *" $context "* ]] && context="${path##*/}"
+    else
         context=$(git -C "$path" rev-parse --short HEAD 2>/dev/null) ||
-        context="${path/#$HOME/\~}"
+            context="${path/#$HOME/\~}"
+    fi
 
     append focus "$session" "$context"
 }
