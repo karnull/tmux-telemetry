@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 
-# Logs which tmux session and git branch (or folder) has focus, one file a day;
-# timesheet turns the records into a report
+# Logs which tmux session and git branch (or folder) has focus, as one CSV file a
+# month; timesheet turns the records into a report
 
 ACTION=$1
 shift
 
 LOGS="${TELEMETRY_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/telemetry}"
+HEADER="timestamp,event,session,context"
 
 
 show_help() {
@@ -16,6 +17,7 @@ Usage: telemetry [action]
 Actions:
   record <PANE>   log the session and branch or folder of a tmux pane
   away            log that tmux was detached
+  migrate         convert daily .tsv records from older versions to monthly .csv
 
 Notes:
   - record and away are run by the tmux and shell hooks, not by hand
@@ -30,11 +32,33 @@ option() {
 #-------------------------------------------------------------------------------
 # recording
 
-append() {
-    local now
-    printf -v now '%(%F %H:%M)T' -1
+# quotes a field only when it needs it, as RFC 4180 has it
+csv_field() {
+    local -n _field=$1
+    [[ "$_field" == *[,\"$'\n']* ]] && _field="\"${_field//\"/\"\"}\""
+}
+
+# <timestamp> <event> <session> <context>, the timestamp in RFC 3339
+write_row() {
+    local timestamp=$1 event=$2 session=$3 context=$4
+    local file="$LOGS/${timestamp:0:7}.csv"
+
+    csv_field session
+    csv_field context
     mkdir -p "$LOGS"
-    printf '%s\t%s\t%s\n' "${now#* }" "$1" "$2" >> "$LOGS/${now% *}.tsv"
+    [ -s "$file" ] || echo "$HEADER" >> "$file"
+    printf '%s,%s,%s,%s\n' "$timestamp" "$event" "$session" "$context" >> "$file"
+}
+
+# %z gives +hhmm, and RFC 3339 wants +hh:mm
+now() {
+    local stamp
+    printf -v stamp '%(%Y-%m-%dT%H:%M:%S%z)T' -1
+    echo "${stamp:0:22}:${stamp:22}"
+}
+
+append() {
+    write_row "$(now)" "$@"
 }
 
 # only the pane in focus counts, so background panes finishing a command don't
@@ -49,7 +73,7 @@ record_pane() {
         context=$(git -C "$path" rev-parse --short HEAD 2>/dev/null) ||
         context="${path/#$HOME/\~}"
 
-    append "$session" "$context"
+    append focus "$session" "$context"
 }
 
 # a popup on an ignored session is a client of its own, so closing it leaves another attached
@@ -59,7 +83,28 @@ record_away() {
     while read -r session; do
         [[ " $ignore " == *" $session "* ]] || return 0
     done < <(tmux list-clients -F '#{client_session}')
-    append "" ""
+    append away "" ""
+}
+
+# a day's .tsv held HH:MM, session and context, with an empty session for away
+migrate() {
+    local file day time session context offset count=0
+    for file in "$LOGS"/*.tsv; do
+        [ -e "$file" ] || break
+        day=$(basename "$file" .tsv)
+        offset=$(date -d "$day 12:00" +%z)
+        while IFS=$'\t' read -r time session context; do
+            if [ -n "$session" ]; then
+                write_row "${day}T$time:00${offset:0:3}:${offset:3}" focus "$session" "$context"
+            else
+                write_row "${day}T$time:00${offset:0:3}:${offset:3}" away "" ""
+            fi
+        done < "$file"
+        mv "$file" "$file.migrated"
+        count=$((count + 1))
+    done
+    rm -f "$LOGS/telemetry.txt"
+    echo "Migrated $count day(s) of records into $LOGS"
 }
 
 
@@ -73,6 +118,10 @@ case "$ACTION" in
 
     away)
         record_away
+        ;;
+
+    migrate)
+        migrate
         ;;
 
     ""|--help|-h|help)

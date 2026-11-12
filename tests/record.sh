@@ -51,13 +51,14 @@ step detach-client -s popup
 step switch-client -t Work
 step detach-client -s Work
 
-actual=$(cut -f 2- "$TELEMETRY_DIR"/*.tsv | uniq)
+actual=$(cut -d, -f 2- "$TELEMETRY_DIR"/*.csv | uniq)
 expected=$(printf '%s\n' \
-    $'Work\tfeat/test' \
-    $'Other\t'"$SCRATCH/plain" \
-    $'Other\t/' \
-    $'Work\tfeat/test' \
-    $'\t')
+    'event,session,context' \
+    'focus,Work,feat/test' \
+    "focus,Other,$SCRATCH/plain" \
+    'focus,Other,/' \
+    'focus,Work,feat/test' \
+    'away,,')
 
 if [ "$actual" == "$expected" ]; then
     echo "record: ok"
