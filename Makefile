@@ -19,8 +19,10 @@ format-dry-run:
 		exit 1; \
 	fi
 
+# the plugin's own tests run beside timesheet's
 test:
 	go test ./...
+	@for t in tests/*.sh; do $$t || exit 1; done
 
 release:
 	./scripts/release.sh $(NAME) $(RELEASE_TARGETS)

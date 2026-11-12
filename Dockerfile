@@ -10,6 +10,10 @@ RUN apt update && apt upgrade -y \
         ca-certificates \
         bash \
         make \
+        git \
+        tmux \
+        zsh \
+        python3 \
     && apt clean \
     && apt autoremove \
     && rm -rf /var/lib/apt/lists/*

@@ -2,7 +2,9 @@
 
 # Drives a private tmux server with a real client attached, and checks what gets logged
 
-command -v python3 >/dev/null || { echo "record: skipped, needs python3 for a pty"; exit 0; }
+for tool in python3 tmux zsh git; do
+    command -v "$tool" >/dev/null || { echo "record: skipped, needs $tool"; exit 0; }
+done
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRATCH=$(mktemp -d)
