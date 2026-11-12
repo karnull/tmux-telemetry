@@ -1,6 +1,8 @@
 # Project tasks. CI runs format-dry-run, build, test and release.
 
 NAME := timesheet
+# CI passes VERSION, which the binary reports with --version
+export GOFLAGS := -ldflags=-X=main.version=$(VERSION)
 RELEASE_TARGETS := linux-arm32 linux-arm64 linux-x64 macOS-intel macOS-apple-silicon
 
 .PHONY: build format format-dry-run test release
