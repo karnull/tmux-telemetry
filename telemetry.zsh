@@ -2,8 +2,6 @@
 
 [[ -n $TELEMETRY_HOME ]] || return 0
 
-alias telemetry="$TELEMETRY_HOME/scripts/telemetry.sh"
-
 _telemetry_record() { "$TELEMETRY_HOME/scripts/telemetry.sh" record "$TMUX_PANE" &>/dev/null &! }
 
 if [[ -n $TMUX ]]; then

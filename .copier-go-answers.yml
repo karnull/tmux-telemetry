@@ -1,0 +1,16 @@
+
+# .copier-go-answers.yml.jinja
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v4.0.0
+_src_path: gh:karshosphere/template-go
+app_type: CLI
+include_database: false
+project_description: Breaks tmux-telemetry records down into a timesheet
+project_name_raw: timesheet
+project_slug: timesheet
+release_targets:
+- linux-arm32
+- linux-arm64
+- linux-x64
+- macOS-intel
+- macOS-apple-silicon
