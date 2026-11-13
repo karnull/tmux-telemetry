@@ -18,7 +18,6 @@ Usage: telemetry [action]
 Actions:
   record <PANE>   log the session, and the window's label or else the branch or folder
   away            log that tmux was detached
-  migrate         convert daily .tsv records from older versions to monthly .csv
 
 Notes:
   - record and away are run by the tmux and shell hooks, not by hand
@@ -115,27 +114,6 @@ record_away() {
     append away "" ""
 }
 
-# a day's .tsv held HH:MM, session and context, with an empty session for away
-migrate() {
-    local file day time session context offset count=0
-    for file in "$LOGS"/*.tsv; do
-        [ -e "$file" ] || break
-        day=$(basename "$file" .tsv)
-        offset=$(date -d "$day 12:00" +%z)
-        while IFS=$'\t' read -r time session context; do
-            if [ -n "$session" ]; then
-                write_row "${day}T$time:00${offset:0:3}:${offset:3}" focus "$session" "$context"
-            else
-                write_row "${day}T$time:00${offset:0:3}:${offset:3}" away "" ""
-            fi
-        done < "$file"
-        mv "$file" "$file.migrated"
-        count=$((count + 1))
-    done
-    rm -f "$LOGS/telemetry.txt"
-    echo "Migrated $count day(s) of records into $LOGS"
-}
-
 
 #-------------------------------------------------------------------------------
 # special commands
@@ -147,10 +125,6 @@ case "$ACTION" in
 
     away)
         record_away
-        ;;
-
-    migrate)
-        migrate
         ;;
 
     ""|--help|-h|help)
