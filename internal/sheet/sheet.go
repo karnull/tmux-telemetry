@@ -166,11 +166,27 @@ type Total struct {
 	Duration time.Duration
 }
 
-// Totals sums each piece of work across the days, longest first, with AFK after
-// everything counted.
+// Totals sums each piece of work across the days, kept together by session: the
+// sessions longest first, and in each its work longest first, then its time not
+// counted. Anything with no counted time at all comes last.
 func Totals(days []Day) []Total {
 	totals := sum(days, true, func(w Work) Work { return w })
-	sort.SliceStable(totals, func(i, j int) bool { return totals[i].Counted() && !totals[j].Counted() })
+	rank := map[string]int{}
+	for i, s := range Sessions(days) {
+		rank[s.Session] = i
+	}
+	group := func(t Total) int {
+		if r, ok := rank[t.Session]; ok {
+			return r
+		}
+		return len(rank)
+	}
+	sort.SliceStable(totals, func(i, j int) bool {
+		if gi, gj := group(totals[i]), group(totals[j]); gi != gj {
+			return gi < gj
+		}
+		return totals[i].Counted() && !totals[j].Counted()
+	})
 	return totals
 }
 

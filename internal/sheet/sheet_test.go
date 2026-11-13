@@ -140,8 +140,8 @@ func TestAFKIsShownButNotCounted(t *testing.T) {
 		}
 	}
 	totals := Totals(days)
-	if last := totals[len(totals)-1]; last.Counted() || Hours(last.Duration) != "0:30" {
-		t.Errorf("AFK should be listed last, with its time: %+v", last)
+	if afk := totals[1]; afk.Session != "Minecraft" || afk.Counted() || Hours(afk.Duration) != "0:30" {
+		t.Errorf("AFK should follow Minecraft's work, with its time: %+v", afk)
 	}
 	if Hours(Grand(days)) != "2:30" || Hours(Away(days)) != "0:30" {
 		t.Errorf("grand %s, away %s", Hours(Grand(days)), Hours(Away(days)))
@@ -208,5 +208,30 @@ func TestShortStopsBeforeDetachingAreDropped(t *testing.T) {
 	days := Build(records("2026-11-12", "17:00 A x", "18:00 A ~", "18:30", "19:00 B y", "19:00:30 C z", "19:00:40"))
 	if got, want := timetable(days[0]), "17:00 - 18:00 A x"; got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTotalsKeepEachSessionTogether(t *testing.T) {
+	days := Build(records("2026-11-12",
+		"09:00 Minecraft a",
+		"11:00 Cyberpunk b",
+		"13:30 Minecraft c",
+		"13:45 Minecraft afk",
+		"14:00 Cyberpunk d",
+		"14:10 Roblox afk",
+		"14:40 Cyberpunk d",
+	))
+
+	var got []string
+	for _, total := range Totals(days) {
+		got = append(got, total.Session+" "+total.Context)
+	}
+	want := []string{
+		"Cyberpunk b", "Cyberpunk d",
+		"Minecraft a", "Minecraft c", "Minecraft afk",
+		"Roblox afk",
+	}
+	if strings.Join(got, ", ") != strings.Join(want, ", ") {
+		t.Errorf("got  %s\nwant %s", strings.Join(got, ", "), strings.Join(want, ", "))
 	}
 }
