@@ -170,3 +170,40 @@ func TestParseLunch(t *testing.T) {
 		}
 	}
 }
+
+func TestAFKIsShownButNotCounted(t *testing.T) {
+	days := Build(records("2026-11-12",
+		"09:00 Minecraft chore/get-started",
+		"10:00 Minecraft afk",
+		"10:30 Minecraft chore/get-started",
+		"11:00 Cyberpunk Meeting",
+		"12:00 Cyberpunk Meeting",
+	), DefaultRules)
+
+	if got, want := timetable(days[0]), strings.Join([]string{
+		"09:00 - 10:00 Minecraft chore/get-started",
+		"10:00 - 10:30 Minecraft afk",
+		"10:30 - 11:00 Minecraft chore/get-started",
+		"11:00 - 12:00 Cyberpunk Meeting",
+	}, "\n"); got != want {
+		t.Errorf("AFK should still show in the timetable:\ngot\n%s\nwant\n%s", got, want)
+	}
+	if got := Hours(days[0].Total()); got != "2:30" {
+		t.Errorf("day total %s, want 2:30 without the AFK half hour", got)
+	}
+	if got := Hours(days[0].Away()); got != "0:30" {
+		t.Errorf("AFK time %s, want 0:30", got)
+	}
+	for _, s := range Sessions(days) {
+		if s.Session == "Minecraft" && Hours(s.Duration) != "1:30" {
+			t.Errorf("Minecraft's total %s, want 1:30 without AFK", Hours(s.Duration))
+		}
+	}
+	totals := Totals(days)
+	if last := totals[len(totals)-1]; last.Counted() || Hours(last.Duration) != "0:30" {
+		t.Errorf("AFK should be listed last, with its time: %+v", last)
+	}
+	if Hours(Grand(days)) != "2:30" || Hours(Away(days)) != "0:30" {
+		t.Errorf("grand %s, away %s", Hours(Grand(days)), Hours(Away(days)))
+	}
+}

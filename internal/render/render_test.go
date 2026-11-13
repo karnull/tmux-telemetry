@@ -73,3 +73,24 @@ func TestTotalsTableFitsTheShareColumn(t *testing.T) {
 		t.Errorf("every row of the table should be the same width:\n%s", table)
 	}
 }
+
+func TestAFKIsShownButNotShared(t *testing.T) {
+	theme := NewTheme(false, sessions)
+	day := sheet.Day{Entries: []sheet.Entry{
+		{Work: sheet.Work{Session: "A", Context: "x"}, Start: 9 * time.Hour, End: 10 * time.Hour},
+		{Work: sheet.Work{Session: "A", Context: "AFK"}, Start: 10 * time.Hour, End: 11 * time.Hour},
+	}}
+	table := Totals(theme, sheet.Totals([]sheet.Day{day}), day.Total())
+	if !strings.Contains(table, NotCounted) || !strings.Contains(table, "| AFK ") {
+		t.Errorf("AFK should be listed as not counted:\n%s", table)
+	}
+	for _, line := range strings.Split(table, "\n") {
+		if strings.Contains(line, "Total") && !strings.Contains(line, "1:00") {
+			t.Errorf("the total should be the hour counted, not two: %s", line)
+		}
+	}
+	span := Span{From: 9 * time.Hour, To: 11 * time.Hour}
+	if got := Timeline(theme, day, sheet.DefaultRules, span, 2); got != theme.Glyph("A")+"z" {
+		t.Errorf("timeline got %q", got)
+	}
+}

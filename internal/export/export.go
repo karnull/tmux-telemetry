@@ -26,12 +26,14 @@ type jsonEntry struct {
 	Session string `json:"session"`
 	Context string `json:"context"`
 	Minutes int    `json:"minutes"`
+	Counted bool   `json:"counted"`
 }
 
 type jsonDay struct {
-	Date    string      `json:"date"`
-	Minutes int         `json:"minutes"`
-	Entries []jsonEntry `json:"entries"`
+	Date       string      `json:"date"`
+	Minutes    int         `json:"minutes"`
+	AFKMinutes int         `json:"afk_minutes"`
+	Entries    []jsonEntry `json:"entries"`
 }
 
 type jsonTotal struct {
@@ -39,14 +41,16 @@ type jsonTotal struct {
 	Context string  `json:"context,omitempty"`
 	Minutes int     `json:"minutes"`
 	Share   float64 `json:"share"`
+	Counted bool    `json:"counted"`
 }
 
 type jsonReport struct {
-	Period   jsonPeriod  `json:"period"`
-	Minutes  int         `json:"minutes"`
-	Days     []jsonDay   `json:"days"`
-	Totals   []jsonTotal `json:"totals"`
-	Sessions []jsonTotal `json:"sessions"`
+	Period     jsonPeriod  `json:"period"`
+	Minutes    int         `json:"minutes"`
+	AFKMinutes int         `json:"afk_minutes"`
+	Days       []jsonDay   `json:"days"`
+	Totals     []jsonTotal `json:"totals"`
+	Sessions   []jsonTotal `json:"sessions"`
 }
 
 func minutes(d time.Duration) int { return int(d.Round(time.Minute) / time.Minute) }
@@ -55,15 +59,16 @@ func totals(list []sheet.Total, grand time.Duration) []jsonTotal {
 	out := make([]jsonTotal, 0, len(list))
 	for _, t := range list {
 		share := 0.0
-		if grand > 0 {
+		if grand > 0 && t.Counted() {
 			share = t.Duration.Seconds() / grand.Seconds()
 		}
-		out = append(out, jsonTotal{Session: t.Session, Context: t.Context, Minutes: minutes(t.Duration), Share: share})
+		out = append(out, jsonTotal{Session: t.Session, Context: t.Context, Minutes: minutes(t.Duration), Share: share, Counted: t.Counted()})
 	}
 	return out
 }
 
-// JSON writes the whole report, durations in minutes and dates as YYYY-MM-DD.
+// JSON writes the whole report, durations in minutes and dates as YYYY-MM-DD. AFK
+// is listed with counted false, and left out of every total but afk_minutes.
 func JSON(w io.Writer, p period.Period, days []sheet.Day) error {
 	grand := sheet.Grand(days)
 	report := jsonReport{
@@ -73,13 +78,14 @@ func JSON(w io.Writer, p period.Period, days []sheet.Day) error {
 			Last:  p.Last.Format(time.DateOnly),
 			Title: p.Title(),
 		},
-		Minutes:  minutes(grand),
-		Days:     []jsonDay{},
-		Totals:   totals(sheet.Totals(days), grand),
-		Sessions: totals(sheet.Sessions(days), grand),
+		Minutes:    minutes(grand),
+		AFKMinutes: minutes(sheet.Away(days)),
+		Days:       []jsonDay{},
+		Totals:     totals(sheet.Totals(days), grand),
+		Sessions:   totals(sheet.Sessions(days), grand),
 	}
 	for _, d := range days {
-		day := jsonDay{Date: d.Date.Format(time.DateOnly), Minutes: minutes(d.Total()), Entries: []jsonEntry{}}
+		day := jsonDay{Date: d.Date.Format(time.DateOnly), Minutes: minutes(d.Total()), AFKMinutes: minutes(d.Away()), Entries: []jsonEntry{}}
 		for _, e := range d.Entries {
 			day.Entries = append(day.Entries, jsonEntry{
 				Start:   sheet.Clock(e.Start),
@@ -87,6 +93,7 @@ func JSON(w io.Writer, p period.Period, days []sheet.Day) error {
 				Session: e.Session,
 				Context: e.Context,
 				Minutes: minutes(e.Duration()),
+				Counted: e.Counted(),
 			})
 		}
 		report.Days = append(report.Days, day)
@@ -97,10 +104,10 @@ func JSON(w io.Writer, p period.Period, days []sheet.Day) error {
 	return enc.Encode(report)
 }
 
-// CSV writes one row per entry, ready for a spreadsheet.
+// CSV writes one row per entry, ready for a spreadsheet, with AFK rows marked as not counted.
 func CSV(w io.Writer, days []sheet.Day) error {
 	out := csv.NewWriter(w)
-	if err := out.Write([]string{"date", "start", "end", "session", "context", "minutes"}); err != nil {
+	if err := out.Write([]string{"date", "start", "end", "session", "context", "minutes", "counted"}); err != nil {
 		return err
 	}
 	for _, d := range days {
@@ -112,6 +119,7 @@ func CSV(w io.Writer, days []sheet.Day) error {
 				e.Session,
 				e.Context,
 				strconv.Itoa(minutes(e.Duration())),
+				strconv.FormatBool(e.Counted()),
 			}
 			if err := out.Write(row); err != nil {
 				return err

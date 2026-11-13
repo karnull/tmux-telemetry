@@ -13,6 +13,9 @@ import (
 
 const shareWidth = 12
 
+// NotCounted stands in for the share of AFK time, which totals leave out.
+const NotCounted = "not counted"
+
 // Bar is a share of the whole as a bar, to an eighth of a cell.
 func Bar(t Theme, session string, share float64, width int) string {
 	eighths := int(share*float64(width*8) + 0.5)
@@ -45,6 +48,11 @@ func cellStyle(t Theme, header bool) lipgloss.Style {
 func Totals(t Theme, totals []sheet.Total, grand time.Duration) string {
 	tbl := newTable(t).Headers("Session", "Work", "Time", "Share")
 	for _, total := range totals {
+		if !total.Counted() {
+			tbl.Row(t.Mark(total.Session)+" "+t.faint(total.Session), t.faint(total.Context),
+				t.faint(sheet.Hours(total.Duration)), t.faint(NotCounted))
+			continue
+		}
 		share := 0.0
 		if grand > 0 {
 			share = total.Duration.Seconds() / grand.Seconds()
@@ -70,6 +78,11 @@ func Totals(t Theme, totals []sheet.Total, grand time.Duration) string {
 func Timetable(t Theme, day sheet.Day) string {
 	tbl := newTable(t).Headers("Time", "Session", "Work", "Hours")
 	for _, e := range day.Entries {
+		if !e.Counted() {
+			tbl.Row(t.faint(sheet.Clock(e.Start)+" - "+sheet.Clock(e.End)), t.Mark(e.Session)+" "+t.faint(e.Session),
+				t.faint(e.Context), t.faint(sheet.Hours(e.Duration())))
+			continue
+		}
 		tbl.Row(
 			sheet.Clock(e.Start)+" - "+sheet.Clock(e.End),
 			t.Mark(e.Session)+" "+t.Paint(e.Session, e.Session),

@@ -281,6 +281,10 @@ func (m *Model) layout() {
 	})
 	var rows []table.Row
 	for _, t := range sheet.Totals(m.days) {
+		if !t.Counted() {
+			rows = append(rows, table.Row{t.Session, t.Context, sheet.Hours(t.Duration), render.NotCounted})
+			continue
+		}
 		share := 0.0
 		if grand > 0 {
 			share = t.Duration.Seconds() / grand.Seconds()
@@ -348,7 +352,7 @@ func (m Model) header() string {
 
 	right := lipgloss.NewStyle().Bold(true).Render(m.period.Title())
 	if m.loaded {
-		right += "  " + faint(fmt.Sprintf("%s over %d day(s)", sheet.Hours(sheet.Grand(m.days)), len(m.days)))
+		right += "  " + faint(render.Summary(m.days))
 	}
 	if m.skipped > 0 {
 		right += "  " + lipgloss.NewStyle().Foreground(lipgloss.ANSIColor(3)).Render(fmt.Sprintf("%d unreadable", m.skipped))

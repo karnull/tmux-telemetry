@@ -15,6 +15,15 @@ type Options struct {
 	Dir        string
 }
 
+// Summary is the time counted over the days, and the AFK time left out of it.
+func Summary(days []sheet.Day) string {
+	s := fmt.Sprintf("%s over %d day(s)", sheet.Hours(sheet.Grand(days)), len(days))
+	if away := sheet.Away(days); away > 0 {
+		s += fmt.Sprintf(", and %s AFK not counted", sheet.Hours(away))
+	}
+	return s
+}
+
 // Report is the whole text report: totals, the pie, a timeline for each day, and
 // each day's timetable when asked for.
 func Report(t Theme, p period.Period, days []sheet.Day, rules sheet.Rules, opts Options) string {
@@ -25,7 +34,7 @@ func Report(t Theme, p period.Period, days []sheet.Day, rules sheet.Rules, opts 
 	}
 
 	sections := []string{
-		header + "  " + t.faint(fmt.Sprintf("%s over %d day(s)", sheet.Hours(grand), len(days))),
+		header + "  " + t.faint(Summary(days)),
 		Totals(t, sheet.Totals(days), grand),
 		PieWithLegend(t, sheet.Sessions(days), 6),
 		Timelines(t, days, rules, opts.Width),
