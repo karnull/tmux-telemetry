@@ -13,7 +13,8 @@ Rename a window to say what the time is going on, and that goes down in place of
 the branch, whatever the pane shows: in a meeting, rename the window `meeting`
 and carry on doodling, and the record says Meeting. Bench, AFK, Research,
 Meeting and Hardware are the names, in any case, and `!meeting` goes down as
-External. timesheet lists AFK time but leaves it out of every total.
+External. A window named `lunch` records a lunch break, which belongs to no
+session. timesheet lists AFK and lunch but leaves them out of every total.
 
 `timesheet`, built from this repository, turns the records into a report: the
 time spent on each session and branch, a pie chart of the sessions, a timeline
@@ -71,12 +72,12 @@ timestamp,event,session,context
 2026-11-10T13:32:08+11:00,focus,Cyberpunk,~/notes
 ```
 
-| Column      | What it holds                                                                                 |
-|-------------|-----------------------------------------------------------------------------------------------|
-| `timestamp` | RFC 3339, with the offset                                                                     |
-| `event`     | `focus` when a pane gains focus or shows a prompt, `away` on detach                           |
-| `session`   | the tmux session                                                                              |
-| `context`   | the window's label; else the git branch; the folder name on the trunk; the folder outside git |
+| Column      | What it holds                                                                                                |
+|-------------|--------------------------------------------------------------------------------------------------------------|
+| `timestamp` | RFC 3339, with the offset                                                                                    |
+| `event`     | `focus` when a pane gains focus or shows a prompt, `away` on detach, `lunch` for a lunch window              |
+| `session`   | the tmux session                                                                                             |
+| `context`   | the window's label; else the git branch; the folder name on the trunk; the folder outside git; empty at home |
 
 ## timesheet
 
@@ -116,13 +117,10 @@ refused, and `04/2026` reads as a month.
 | `-i`, `--interactive` | browse the report in the terminal                               |
 | `-f`, `--format`      | `text`, `json` for the whole report, `csv` for one row an entry |
 | `--colour`            | `auto`, `always` or `never`; `NO_COLOR` is honoured             |
-| `--day-start`         | when the working day starts, `09:00` unless set                 |
-| `--lunch`             | lunch left out of the day, `12:00-13:00` unless set, or `none`  |
 | `--dir`               | where the records are                                           |
 
-`TIMESHEET_DAY_START` and `TIMESHEET_LUNCH` set the working day for every run,
-and the options win over them. Without colour, from `NO_COLOR`, a pipe or
-`--colour never`, sessions stand apart by glyph instead.
+Without colour, from `NO_COLOR`, a pipe or `--colour never`, sessions stand
+apart by glyph instead.
 
 Errors go to stderr as `timesheet: message`. A mistake in the options exits with
 status 2, and any other failure with 1. `timesheet completion zsh` (or `bash`,
@@ -130,16 +128,18 @@ status 2, and any other failure with 1. `timesheet completion zsh` (or `bash`,
 
 ### How the time is counted
 
+* A day runs from its first record to its last, with no fixed hours.
 * Records in a row with the same session and branch make one stretch, which lasts
   until the next change. The last stretch of a day ends at its last record.
-* The first stretch of the morning counts from the start of the day, even if the
-  terminal came out later, and anything earlier is dropped.
-* A stretch still running at lunch stops there, and work picks up again at the
-  first record after it.
+* Time at home, or anywhere for less than a minute, is only passing through: it
+  goes to the next place the work stays, from when it started. A quick hop away
+  and straight back leaves one stretch, and passing through just before a detach
+  or the end of the day isn't counted.
 * Detaching tmux counts as away until the next record.
-* AFK shows in the totals table, the timetables and the timeline, as a faint `z`,
-  but is left out of each session's total, the pie chart and every day's total.
-  JSON and CSV mark it with `counted` false.
+* AFK and lunch breaks show in the totals table, the timetables and the timeline,
+  AFK as a faint `z` and lunch as faint dots, but are left out of each session's
+  total, the pie chart and every day's total. JSON and CSV mark them with
+  `counted` false.
 
 ### Interactive
 

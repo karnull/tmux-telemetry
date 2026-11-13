@@ -28,7 +28,7 @@ counting time are tested apart from how they are shown.
 | Package             | What it does                                                           |
 |---------------------|------------------------------------------------------------------------|
 | `internal/record`   | reads the records, skipping rows a crash cut short                     |
-| `internal/sheet`    | turns records into each day's entries, with the day start and lunch    |
+| `internal/sheet`    | turns records into each day's entries, leaving AFK and lunch uncounted |
 | `internal/period`   | days, ISO weeks, months and ranges: reading them, and stepping through |
 | `internal/render`   | Lip Gloss tables, the pie chart, timelines and the text report         |
 | `internal/export`   | JSON and CSV output                                                    |
