@@ -147,6 +147,12 @@ timesheet -pm -f csv > november.csv`,
 		},
 	}
 	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return UsageError{err} })
+	// --help says it all, so the help command still works but stays out of the list
+	cmd.SetHelpCommand(&cobra.Command{
+		Use:    "help",
+		Hidden: true,
+		Run:    func(c *cobra.Command, _ []string) { _ = c.Root().Help() },
+	})
 
 	f := cmd.Flags()
 	f.SortFlags = false
