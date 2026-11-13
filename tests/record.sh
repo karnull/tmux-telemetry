@@ -56,6 +56,7 @@ step switch-client -t Work
 step rename-window -t Work: MEETING
 step rename-window -t Work: '!Meeting'
 step rename-window -t Work: afk
+step rename-window -t Work: Lunch
 step rename-window -t Work: notes
 # a trunk set with no ignore list must still be read as the trunk
 step set -gu @telemetry-ignore
@@ -74,6 +75,7 @@ expected=$(printf '%s\n' \
     'focus,Work,Meeting' \
     'focus,Work,External' \
     'focus,Work,AFK' \
+    'lunch,,' \
     'focus,Work,feat/test' \
     'focus,Work,repo' \
     'away,,')
