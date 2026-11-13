@@ -207,3 +207,21 @@ func TestAFKIsShownButNotCounted(t *testing.T) {
 		t.Errorf("grand %s, away %s", Hours(Grand(days)), Hours(Away(days)))
 	}
 }
+
+func TestLunchBreakBelongsToNoSession(t *testing.T) {
+	recs := records("2026-11-12", "09:00 Minecraft main", "12:10 Minecraft main", "14:00 Minecraft main")
+	recs[1] = record.Record{Time: recs[1].Time, Event: record.Lunch}
+	days := Build(recs, Rules{DayStart: 9 * time.Hour, LunchStart: NoLunch, LunchEnd: NoLunch})
+
+	if got, want := timetable(days[0]), "09:00 - 12:10 Minecraft main\n12:10 - 14:00 Lunch break "; got != want {
+		t.Errorf("got\n%q\nwant\n%q", got, want)
+	}
+	if Hours(days[0].Total()) != "3:10" || Hours(days[0].Breaks()) != "1:50" || days[0].Away() != 0 {
+		t.Errorf("total %s, lunch %s, AFK %s", Hours(days[0].Total()), Hours(days[0].Breaks()), Hours(days[0].Away()))
+	}
+	for _, s := range Sessions(days) {
+		if s.Session == LunchBreak {
+			t.Error("a lunch break should not be a session in the pie")
+		}
+	}
+}

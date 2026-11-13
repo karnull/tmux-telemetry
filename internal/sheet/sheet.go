@@ -53,17 +53,25 @@ func ParseLunch(s string) (start, end time.Duration, err error) {
 	return start, end, nil
 }
 
-// Work is what a stretch of time went on: a session, and a branch or folder in it.
+// Work is what a stretch of time went on: a session, and a branch or folder in it,
+// or a lunch break, which belongs to no session.
 type Work struct {
 	Session string
 	Context string
+	Break   bool
 }
 
 // AFK is the label for time away from the keyboard: shown, but never counted.
 const AFK = "AFK"
 
-// Counted says whether the time goes into totals, which AFK time doesn't.
-func (w Work) Counted() bool { return !strings.EqualFold(w.Context, AFK) }
+// LunchBreak names a lunch break where a session would go.
+const LunchBreak = "Lunch break"
+
+// IsAFK says whether the time was spent away from the keyboard.
+func (w Work) IsAFK() bool { return !w.Break && strings.EqualFold(w.Context, AFK) }
+
+// Counted says whether the time goes into totals, which AFK and lunch don't.
+func (w Work) Counted() bool { return !w.Break && !w.IsAFK() }
 
 // Entry is one stretch of work in a day, as time since that day's midnight.
 type Entry struct {
@@ -93,14 +101,19 @@ func (d Day) Total() time.Duration {
 }
 
 // Away is the AFK time in a day.
-func (d Day) Away() time.Duration {
-	var away time.Duration
+func (d Day) Away() time.Duration { return d.sum(func(w Work) bool { return w.IsAFK() }) }
+
+// Breaks is the lunch break time in a day.
+func (d Day) Breaks() time.Duration { return d.sum(func(w Work) bool { return w.Break }) }
+
+func (d Day) sum(include func(Work) bool) time.Duration {
+	var total time.Duration
 	for _, e := range d.Entries {
-		if !e.Counted() {
-			away += e.Duration()
+		if include(e.Work) {
+			total += e.Duration()
 		}
 	}
-	return away
+	return total
 }
 
 // Build splits records into days and turns each day into entries.
@@ -139,6 +152,9 @@ func buildDay(records []record.Record, rules Rules) []Entry {
 	for i, rec := range records {
 		t := clock(rec.Time)
 		w := Work{Session: rec.Session, Context: rec.Context}
+		if rec.Event == record.Lunch {
+			w = Work{Session: LunchBreak, Break: true}
+		}
 		away := rec.Event == record.Away
 		intoLunch := i > 0 && last < rules.LunchStart && t >= rules.LunchStart
 		if len(runs) == 0 || intoLunch || runs[len(runs)-1].away != away || runs[len(runs)-1].work != w {
@@ -235,6 +251,15 @@ func Away(days []Day) time.Duration {
 		away += d.Away()
 	}
 	return away
+}
+
+// Breaks is the lunch break time across all the days.
+func Breaks(days []Day) time.Duration {
+	var breaks time.Duration
+	for _, d := range days {
+		breaks += d.Breaks()
+	}
+	return breaks
 }
 
 // Hours shows a duration as H:MM, the way a timesheet does.

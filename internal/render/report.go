@@ -15,11 +15,18 @@ type Options struct {
 	Dir        string
 }
 
-// Summary is the time counted over the days, and the AFK time left out of it.
+// Summary is the time counted over the days, and the AFK and lunch left out of it.
 func Summary(days []sheet.Day) string {
 	s := fmt.Sprintf("%s over %d day(s)", sheet.Hours(sheet.Grand(days)), len(days))
+	var left []string
 	if away := sheet.Away(days); away > 0 {
-		s += fmt.Sprintf(", and %s AFK not counted", sheet.Hours(away))
+		left = append(left, sheet.Hours(away)+" AFK")
+	}
+	if breaks := sheet.Breaks(days); breaks > 0 {
+		left = append(left, sheet.Hours(breaks)+" lunch")
+	}
+	if len(left) > 0 {
+		s += ", not counting " + strings.Join(left, " and ")
 	}
 	return s
 }

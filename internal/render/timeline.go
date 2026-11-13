@@ -49,7 +49,7 @@ func Axis(t Theme, span Span, width int) string {
 }
 
 // Timeline draws a day as a bar, each cell showing the session that held it longest.
-// AFK shows as a faint z, and lunch faintly where nothing was worked through it.
+// AFK shows as a faint z, and a lunch break as faint dots.
 func Timeline(t Theme, day sheet.Day, rules sheet.Rules, span Span, width int) string {
 	if width < 1 {
 		return ""
@@ -67,6 +67,8 @@ func Timeline(t Theme, day sheet.Day, rules sheet.Rules, span Span, width int) s
 			}
 		}
 		switch {
+		case held > 0 && best.Break:
+			b.WriteString(t.faint("·"))
 		case held > 0 && !best.Counted():
 			b.WriteString(t.faint("z"))
 		case held > 0:
