@@ -59,6 +59,12 @@ type Work struct {
 	Context string
 }
 
+// AFK is the label for time away from the keyboard: shown, but never counted.
+const AFK = "AFK"
+
+// Counted says whether the time goes into totals, which AFK time doesn't.
+func (w Work) Counted() bool { return !strings.EqualFold(w.Context, AFK) }
+
 // Entry is one stretch of work in a day, as time since that day's midnight.
 type Entry struct {
 	Work
@@ -75,13 +81,26 @@ type Day struct {
 	Entries []Entry
 }
 
-// Total is all the time spent in a day.
+// Total is all the time counted in a day, which leaves out AFK.
 func (d Day) Total() time.Duration {
 	var total time.Duration
 	for _, e := range d.Entries {
-		total += e.Duration()
+		if e.Counted() {
+			total += e.Duration()
+		}
 	}
 	return total
+}
+
+// Away is the AFK time in a day.
+func (d Day) Away() time.Duration {
+	var away time.Duration
+	for _, e := range d.Entries {
+		if !e.Counted() {
+			away += e.Duration()
+		}
+	}
+	return away
 }
 
 // Build splits records into days and turns each day into entries.
@@ -165,21 +184,27 @@ type Total struct {
 	Duration time.Duration
 }
 
-// Totals sums each piece of work across the days, longest first.
+// Totals sums each piece of work across the days, longest first, with AFK after
+// everything counted.
 func Totals(days []Day) []Total {
-	return sum(days, func(w Work) Work { return w })
+	totals := sum(days, true, func(w Work) Work { return w })
+	sort.SliceStable(totals, func(i, j int) bool { return totals[i].Counted() && !totals[j].Counted() })
+	return totals
 }
 
-// Sessions sums each session across the days, longest first.
+// Sessions sums the time counted in each session across the days, longest first.
 func Sessions(days []Day) []Total {
-	return sum(days, func(w Work) Work { return Work{Session: w.Session} })
+	return sum(days, false, func(w Work) Work { return Work{Session: w.Session} })
 }
 
-func sum(days []Day, key func(Work) Work) []Total {
+func sum(days []Day, withAway bool, key func(Work) Work) []Total {
 	index := map[Work]int{}
 	var totals []Total
 	for _, day := range days {
 		for _, e := range day.Entries {
+			if !withAway && !e.Counted() {
+				continue
+			}
 			k := key(e.Work)
 			i, ok := index[k]
 			if !ok {
@@ -194,13 +219,22 @@ func sum(days []Day, key func(Work) Work) []Total {
 	return totals
 }
 
-// Grand is the time spent across all the days.
+// Grand is the time counted across all the days.
 func Grand(days []Day) time.Duration {
 	var total time.Duration
 	for _, d := range days {
 		total += d.Total()
 	}
 	return total
+}
+
+// Away is the AFK time across all the days.
+func Away(days []Day) time.Duration {
+	var away time.Duration
+	for _, d := range days {
+		away += d.Away()
+	}
+	return away
 }
 
 // Hours shows a duration as H:MM, the way a timesheet does.

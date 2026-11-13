@@ -49,7 +49,7 @@ func Axis(t Theme, span Span, width int) string {
 }
 
 // Timeline draws a day as a bar, each cell showing the session that held it longest.
-// Lunch shows faintly where nothing was worked through it.
+// AFK shows as a faint z, and lunch faintly where nothing was worked through it.
 func Timeline(t Theme, day sheet.Day, rules sheet.Rules, span Span, width int) string {
 	if width < 1 {
 		return ""
@@ -59,15 +59,18 @@ func Timeline(t Theme, day sheet.Day, rules sheet.Rules, span Span, width int) s
 	for i := 0; i < width; i++ {
 		from := span.From + time.Duration(i)*cell
 		to := from + cell
-		best, held := "", time.Duration(0)
+		var best sheet.Entry
+		held := time.Duration(0)
 		for _, e := range day.Entries {
 			if overlap := min(to, e.End) - max(from, e.Start); overlap > held {
-				best, held = e.Session, overlap
+				best, held = e, overlap
 			}
 		}
 		switch {
+		case held > 0 && !best.Counted():
+			b.WriteString(t.faint("z"))
 		case held > 0:
-			b.WriteString(t.Paint(best, t.Glyph(best)))
+			b.WriteString(t.Paint(best.Session, t.Glyph(best.Session)))
 		case from < rules.LunchEnd && to > rules.LunchStart:
 			b.WriteString(t.faint("·"))
 		default:
