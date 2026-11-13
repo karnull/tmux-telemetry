@@ -64,8 +64,10 @@ append() {
 # only the pane in focus counts, so background panes finishing a command don't
 record_pane() {
     local active session path ignore trunk context
+    # read folds runs of tabs together, so options that may be empty carry a leading =
     IFS=$'\t' read -r active session path ignore trunk < <(tmux display-message -p -t "$1" \
-        '#{&&:#{session_attached},#{&&:#{window_active},#{pane_active}}}	#{session_name}	#{pane_current_path}	#{@telemetry-ignore}	#{@telemetry-trunk}')
+        '#{&&:#{session_attached},#{&&:#{window_active},#{pane_active}}}	#{session_name}	#{pane_current_path}	=#{@telemetry-ignore}	=#{@telemetry-trunk}')
+    ignore=${ignore#=} trunk=${trunk#=}
 
     [[ "$active" == 1 && -n "$session" && " $ignore " != *" $session "* ]] || return 0
 

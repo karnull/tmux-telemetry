@@ -32,7 +32,7 @@ import os, pty, sys, time
 pid, fd = pty.fork()
 if pid == 0:
     os.execvp("tmux", ["tmux", "attach", "-t", sys.argv[1]])
-end = time.time() + 12
+end = time.time() + 20
 while time.time() < end:
     try:
         os.read(fd, 65536)
@@ -53,6 +53,10 @@ attach popup; sleep 2
 step send -t popup 'true' Enter
 step detach-client -s popup
 step switch-client -t Work
+# a trunk set with no ignore list must still be read as the trunk
+step set -gu @telemetry-ignore
+step set -g @telemetry-trunk feat/test
+step send -t Work 'true' Enter
 step detach-client -s Work
 
 actual=$(cut -d, -f 2- "$TELEMETRY_DIR"/*.csv | uniq)
@@ -63,6 +67,7 @@ expected=$(printf '%s\n' \
     'focus,Other,/' \
     'focus,Other,Widget' \
     'focus,Work,feat/test' \
+    'focus,Work,repo' \
     'away,,')
 
 if [ "$actual" == "$expected" ]; then
