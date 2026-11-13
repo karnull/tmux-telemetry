@@ -33,7 +33,7 @@ counting time are tested apart from how they are shown.
 | `internal/render`   | Lip Gloss tables, the pie chart, timelines and the text report         |
 | `internal/export`   | JSON and CSV output                                                    |
 | `internal/cli`      | the command and its options, built on Cobra and run through Fang       |
-| `internal/tui`      | the interactive view, built on Bubble Tea and Bubbles                  |
+| `internal/tui`      | the interactive view on Bubble Tea, with Lip Gloss layers to click on  |
 
 Records flow one way: `record` → `sheet` → `render`, `export` or `tui`, with
 `period` deciding which days to read.
