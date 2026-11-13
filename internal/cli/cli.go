@@ -319,7 +319,11 @@ func run(cmd *cobra.Command, env Env, opts options) error {
 		if !isTerminal(env.Stdout) || !isTerminal(os.Stdin) {
 			return usagef("--interactive needs a terminal")
 		}
-		return tui.Run(cmd.Context(), tui.Config{Dir: dir, Period: p, Now: env.Now})
+		cfg := tui.Config{Dir: dir, Period: p, Now: env.Now}
+		if sel, ok := opts.selection(); ok {
+			cfg.Detail = &sel
+		}
+		return tui.Run(cmd.Context(), cfg)
 	}
 
 	loaded, err := record.Load(dir, p.First, p.Last)
