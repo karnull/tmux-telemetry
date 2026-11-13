@@ -15,7 +15,7 @@ counting time are tested apart from how they are shown.
 |-------------------------|----------------------------------------------------------------|
 | `telemetry.tmux`        | the plugin's entry point, which tpm runs: it sets the hooks    |
 | `telemetry.zsh`         | the prompt hook, sourced from `.zshrc`                         |
-| `scripts/telemetry.sh`  | writes the records, and migrates daily records from before     |
+| `scripts/telemetry.sh`  | writes the records                                             |
 | `scripts/release.sh`    | timesheet's release build, from the template                   |
 | `tests/`                | the plugin's tests, which `make test` runs after timesheet's   |
 | `cmd/`                  | timesheet's entry point: version, error output and exit status |

@@ -71,17 +71,6 @@ timestamp,event,session,context
 | `session`   | the tmux session                                                     |
 | `context`   | the git branch; the folder name on the trunk; the folder outside git |
 
-### Upgrading from daily records
-
-Older versions kept one `.tsv` file a day. Convert them once:
-
-```sh
-"$TELEMETRY_HOME/scripts/telemetry.sh" migrate
-```
-
-Each converted file is kept as `.tsv.migrated`, and `telemetry.txt` is removed.
-
-
 ## timesheet
 
 Without a period, `timesheet` reports the previous week.
