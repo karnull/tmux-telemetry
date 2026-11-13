@@ -9,6 +9,12 @@ through any alias, and `git switch`, are picked up without wrapping either.
 Panes in the background, sessions with no client attached and ignored sessions
 log nothing. Detaching tmux counts as away.
 
+Rename a window to say what the time is going on, and that goes down in place of
+the branch, whatever the pane shows: in a meeting, rename the window `meeting`
+and carry on doodling, and the record says Meeting. Bench, AFK, Research,
+Meeting and Hardware are the names, in any case, and `!meeting` goes down as
+External. timesheet lists AFK time but leaves it out of every total.
+
 `timesheet`, built from this repository, turns the records into a report: the
 time spent on each session and branch, a pie chart of the sessions, a timeline
 of every day, and an interactive view to browse it all.
@@ -45,10 +51,11 @@ build it with `make build`, which needs Go 1.26 or later.
 
 ## Options
 
-| Option              | Default       | What it does                                      |
-|---------------------|---------------|---------------------------------------------------|
-| `@telemetry-ignore` | empty         | sessions never logged, space separated            |
-| `@telemetry-trunk`  | `main master` | branches recorded by folder name, space separated |
+| Option              | Default                               | What it does                                                  |
+|---------------------|---------------------------------------|---------------------------------------------------------------|
+| `@telemetry-ignore` | empty                                 | sessions never logged, space separated                        |
+| `@telemetry-trunk`  | `main master`                         | branches recorded by folder name, space separated             |
+| `@telemetry-labels` | `Bench AFK Research Meeting Hardware` | window names recorded in place of the branch, space separated |
 
 The records go to `$XDG_STATE_HOME/telemetry`, or to `$TELEMETRY_DIR` when set.
 
@@ -64,12 +71,12 @@ timestamp,event,session,context
 2026-11-10T13:32:08+11:00,focus,Cyberpunk,~/notes
 ```
 
-| Column      | What it holds                                                        |
-|-------------|----------------------------------------------------------------------|
-| `timestamp` | RFC 3339, with the offset                                            |
-| `event`     | `focus` when a pane gains focus or shows a prompt, `away` on detach  |
-| `session`   | the tmux session                                                     |
-| `context`   | the git branch; the folder name on the trunk; the folder outside git |
+| Column      | What it holds                                                                                 |
+|-------------|-----------------------------------------------------------------------------------------------|
+| `timestamp` | RFC 3339, with the offset                                                                     |
+| `event`     | `focus` when a pane gains focus or shows a prompt, `away` on detach                           |
+| `session`   | the tmux session                                                                              |
+| `context`   | the window's label; else the git branch; the folder name on the trunk; the folder outside git |
 
 ### Upgrading from daily records
 
@@ -141,6 +148,9 @@ status 2, and any other failure with 1. `timesheet completion zsh` (or `bash`,
 * A stretch still running at lunch stops there, and work picks up again at the
   first record after it.
 * Detaching tmux counts as away until the next record.
+* AFK shows in the totals table, the timetables and the timeline, as a faint `z`,
+  but is left out of each session's total, the pie chart and every day's total.
+  JSON and CSV mark it with `counted` false.
 
 ### Interactive
 
