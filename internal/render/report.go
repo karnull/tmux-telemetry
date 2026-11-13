@@ -33,7 +33,7 @@ func Summary(days []sheet.Day) string {
 
 // Report is the whole text report: totals, the pie, a timeline for each day, and
 // each day's timetable when asked for.
-func Report(t Theme, p period.Period, days []sheet.Day, rules sheet.Rules, opts Options) string {
+func Report(t Theme, p period.Period, days []sheet.Day, opts Options) string {
 	grand := sheet.Grand(days)
 	header := t.bold(p.Title())
 	if len(days) == 0 {
@@ -44,7 +44,7 @@ func Report(t Theme, p period.Period, days []sheet.Day, rules sheet.Rules, opts 
 		header + "  " + t.faint(Summary(days)),
 		Totals(t, sheet.Totals(days), grand),
 		PieWithLegend(t, sheet.Sessions(days), 6),
-		Timelines(t, days, rules, opts.Width),
+		Timelines(t, days, opts.Width),
 	}
 	if opts.Timetables {
 		for _, d := range days {

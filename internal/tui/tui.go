@@ -25,7 +25,6 @@ import (
 type Config struct {
 	Dir    string
 	Period period.Period
-	Rules  sheet.Rules
 	Now    func() time.Time
 }
 
@@ -108,7 +107,7 @@ func (m Model) load() tea.Cmd {
 	cfg, p := m.cfg, m.period
 	return func() tea.Msg {
 		got, err := record.Load(cfg.Dir, p.First, p.Last)
-		return loadedMsg{period: p, days: sheet.Build(got.Records, cfg.Rules), skipped: got.Skipped, err: err}
+		return loadedMsg{period: p, days: sheet.Build(got.Records), skipped: got.Skipped, err: err}
 	}
 }
 
@@ -413,13 +412,13 @@ func (m Model) dayDetail(width int) string {
 	if !ok {
 		return title + "\n\n" + faint("Nothing recorded.")
 	}
-	span := render.SpanOf([]sheet.Day{d}, m.cfg.Rules)
+	span := render.SpanOf([]sheet.Day{d})
 	barWidth := max(10, width-2)
 	return strings.Join([]string{
 		title + "  " + faint(sheet.Hours(d.Total())),
 		"",
 		" " + render.Axis(m.theme, span, barWidth),
-		faint("│") + render.Timeline(m.theme, d, m.cfg.Rules, span, barWidth) + faint("│"),
+		faint("│") + render.Timeline(m.theme, d, span, barWidth) + faint("│"),
 		"",
 		render.Timetable(m.theme, d),
 	}, "\n")
@@ -429,5 +428,5 @@ func (m Model) timelines() string {
 	if len(m.days) == 0 {
 		return faint("Nothing recorded for " + m.period.Title() + ".")
 	}
-	return render.Timelines(m.theme, m.days, m.cfg.Rules, m.width) + "\n\n" + render.Legend(m.theme, sheet.Sessions(m.days))
+	return render.Timelines(m.theme, m.days, m.width) + "\n\n" + render.Legend(m.theme, sheet.Sessions(m.days))
 }

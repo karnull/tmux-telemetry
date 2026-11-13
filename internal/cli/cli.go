@@ -61,8 +61,7 @@ type options struct {
 
 	since, until string
 
-	dayStart, lunch string
-	dir             string
+	dir string
 
 	format      string
 	color       string
@@ -81,13 +80,6 @@ type Env struct {
 // System is the real environment.
 func System() Env {
 	return Env{Stdout: os.Stdout, Stderr: os.Stderr, Now: time.Now, Getenv: os.Getenv, Environ: os.Environ}
-}
-
-func envOr(env Env, name, fallback string) string {
-	if v := env.Getenv(name); v != "" {
-		return v
-	}
-	return fallback
 }
 
 // New builds the root command.
@@ -162,8 +154,6 @@ timesheet -pm -f csv > november.csv`,
 	unit(&opts.month, "month", "m", "a month, such as "+period.MonthForms)
 	f.StringVarP(&opts.since, "since", "s", "", "first day of a range, in any form --day takes")
 	f.StringVarP(&opts.until, "until", "u", "", "last day of a range, in any form --day takes (default today)")
-	f.StringVar(&opts.dayStart, "day-start", envOr(env, "TIMESHEET_DAY_START", "09:00"), "when the working day starts, as HH:MM ($TIMESHEET_DAY_START)")
-	f.StringVar(&opts.lunch, "lunch", envOr(env, "TIMESHEET_LUNCH", "12:00-13:00"), "lunch left out of the day, as HH:MM-HH:MM or none ($TIMESHEET_LUNCH)")
 	f.StringVar(&opts.dir, "dir", "", "where the records are (default $TELEMETRY_DIR, or $XDG_STATE_HOME/telemetry)")
 	f.StringVarP(&opts.format, "format", "f", "text", "output as text, json or csv")
 	f.StringVar(&opts.color, "colour", "auto", "colour the output: auto, always or never ($NO_COLOR is honoured)")
@@ -269,18 +259,6 @@ func (o options) resolveRange(today record.Date) (period.Period, error) {
 	return p, nil
 }
 
-func (o options) rules() (sheet.Rules, error) {
-	start, err := sheet.ParseClock(o.dayStart)
-	if err != nil {
-		return sheet.Rules{}, usagef("--day-start: %w", err)
-	}
-	lunchStart, lunchEnd, err := sheet.ParseLunch(o.lunch)
-	if err != nil {
-		return sheet.Rules{}, usagef("--lunch: %w", err)
-	}
-	return sheet.Rules{DayStart: start, LunchStart: lunchStart, LunchEnd: lunchEnd}, nil
-}
-
 func (o options) profile(env Env) (colorprofile.Profile, error) {
 	detected := colorprofile.Detect(env.Stdout, env.Environ())
 	switch o.color {
@@ -317,10 +295,6 @@ func run(cmd *cobra.Command, env Env, opts options) error {
 	if err != nil {
 		return err
 	}
-	rules, err := opts.rules()
-	if err != nil {
-		return err
-	}
 	profile, err := opts.profile(env)
 	if err != nil {
 		return err
@@ -337,7 +311,7 @@ func run(cmd *cobra.Command, env Env, opts options) error {
 		if !isTerminal(env.Stdout) || !isTerminal(os.Stdin) {
 			return usagef("--interactive needs a terminal")
 		}
-		return tui.Run(cmd.Context(), tui.Config{Dir: dir, Period: p, Rules: rules, Now: env.Now})
+		return tui.Run(cmd.Context(), tui.Config{Dir: dir, Period: p, Now: env.Now})
 	}
 
 	loaded, err := record.Load(dir, p.First, p.Last)
@@ -347,7 +321,7 @@ func run(cmd *cobra.Command, env Env, opts options) error {
 	if loaded.Skipped > 0 {
 		fmt.Fprintf(env.Stderr, "timesheet: skipped %d unreadable record(s) in %s\n", loaded.Skipped, dir)
 	}
-	days := sheet.Build(loaded.Records, rules)
+	days := sheet.Build(loaded.Records)
 
 	switch strings.ToLower(opts.format) {
 	case "json":
@@ -357,7 +331,7 @@ func run(cmd *cobra.Command, env Env, opts options) error {
 	case "text":
 		theme := render.NewTheme(profile > colorprofile.ASCII, sheet.Sessions(days))
 		out := &colorprofile.Writer{Forward: env.Stdout, Profile: profile}
-		report := render.Report(theme, p, days, rules, render.Options{Width: width(env.Stdout, env), Timetables: opts.timetable, Dir: dir})
+		report := render.Report(theme, p, days, render.Options{Width: width(env.Stdout, env), Timetables: opts.timetable, Dir: dir})
 		_, err := io.WriteString(out, report)
 		return err
 	}

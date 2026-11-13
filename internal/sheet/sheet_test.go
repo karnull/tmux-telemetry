@@ -37,7 +37,7 @@ func timetable(day Day) string {
 	return strings.Join(lines, "\n")
 }
 
-// the Tuesday from the original request
+// the Tuesday from the original request, with the day running from its first record
 func TestBuildMatchesTheRequest(t *testing.T) {
 	days := Build(records("2026-11-10",
 		"08:40 Roblox release-1.0",
@@ -53,10 +53,10 @@ func TestBuildMatchesTheRequest(t *testing.T) {
 		"16:42 Cyberpunk chore/auto-update",
 		"17:11 Cyberpunk feat/dynamic-weather",
 		"18:30 Cyberpunk feat/dynamic-weather",
-	), DefaultRules)
+	))
 
 	want := strings.Join([]string{
-		"09:00 - 12:00 Roblox release-1.0",
+		"08:40 - 12:30 Roblox release-1.0",
 		"13:32 - 15:01 Minecraft chore/get-started",
 		"15:01 - 15:13 Minecraft chore/auto-update",
 		"15:13 - 15:15 Cyberpunk feat/dynamic-weather",
@@ -77,7 +77,7 @@ func TestBuildMatchesTheRequest(t *testing.T) {
 		totals[total.Session+" "+total.Context] = Hours(total.Duration)
 	}
 	for work, hours := range map[string]string{
-		"Roblox release-1.0":             "3:00",
+		"Roblox release-1.0":             "3:50",
 		"Minecraft chore/get-started":    "1:29",
 		"Minecraft chore/auto-update":    "0:12",
 		"Cyberpunk feat/dynamic-weather": "1:21",
@@ -91,60 +91,10 @@ func TestBuildMatchesTheRequest(t *testing.T) {
 	}
 }
 
-func TestLunch(t *testing.T) {
-	days := Build(records("2026-11-11",
-		"09:05 Minecraft chore/get-started",
-		"11:00 Minecraft chore/get-started",
-		"12:40 Cyberpunk notes",
-		"13:50 Cyberpunk notes",
-		"14:32 Minecraft chore/get-started",
-		"16:00",
-		"16:30 Minecraft chore/get-started",
-		"17:25 Minecraft chore/get-started",
-	), DefaultRules)
-
-	want := strings.Join([]string{
-		"09:00 - 12:00 Minecraft chore/get-started",
-		"13:00 - 14:32 Cyberpunk notes",
-		"14:32 - 16:00 Minecraft chore/get-started",
-		"16:30 - 17:25 Minecraft chore/get-started",
-	}, "\n")
-	if got := timetable(days[0]); got != want {
-		t.Errorf("got\n%s\nwant\n%s", got, want)
-	}
-}
-
-func TestSameWorkCarriesOnAfterLunch(t *testing.T) {
-	days := Build(records("2026-11-12",
-		"10:00 A x",
-		"11:30 A x",
-		"13:20 A x",
-		"15:00 A x",
-	), DefaultRules)
-	if got, want := timetable(days[0]), "09:00 - 12:00 A x\n13:20 - 15:00 A x"; got != want {
-		t.Errorf("got\n%s\nwant\n%s", got, want)
-	}
-}
-
-func TestAfternoonStartIsNotStretched(t *testing.T) {
-	days := Build(records("2026-11-12", "14:00 A x", "15:00 A x"), DefaultRules)
-	if got, want := timetable(days[0]), "14:00 - 15:00 A x"; got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
-func TestNoLunch(t *testing.T) {
-	rules := Rules{DayStart: 9 * time.Hour, LunchStart: NoLunch, LunchEnd: NoLunch}
-	days := Build(records("2026-11-12", "10:00 A x", "15:00 A x"), rules)
-	if got, want := timetable(days[0]), "09:00 - 15:00 A x"; got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
 func TestDaysSplitAndSessionsSum(t *testing.T) {
 	recs := append(records("2026-11-09", "09:00 A x", "10:00 B y", "11:00 B y"),
 		records("2026-11-10", "09:00 A z", "11:30 A z")...)
-	days := Build(recs, DefaultRules)
+	days := Build(recs)
 	if len(days) != 2 {
 		t.Fatalf("got %d days", len(days))
 	}
@@ -157,20 +107,6 @@ func TestDaysSplitAndSessionsSum(t *testing.T) {
 	}
 }
 
-func TestParseLunch(t *testing.T) {
-	if s, e, err := ParseLunch("12:30-13:15"); err != nil || Clock(s) != "12:30" || Clock(e) != "13:15" {
-		t.Errorf("got %v %v %v", s, e, err)
-	}
-	if s, _, err := ParseLunch("none"); err != nil || s != NoLunch {
-		t.Errorf("none: got %v %v", s, err)
-	}
-	for _, bad := range []string{"12:00", "13:00-12:00", "noon-1"} {
-		if _, _, err := ParseLunch(bad); err == nil {
-			t.Errorf("%q should not parse", bad)
-		}
-	}
-}
-
 func TestAFKIsShownButNotCounted(t *testing.T) {
 	days := Build(records("2026-11-12",
 		"09:00 Minecraft chore/get-started",
@@ -178,7 +114,7 @@ func TestAFKIsShownButNotCounted(t *testing.T) {
 		"10:30 Minecraft chore/get-started",
 		"11:00 Cyberpunk Meeting",
 		"12:00 Cyberpunk Meeting",
-	), DefaultRules)
+	))
 
 	if got, want := timetable(days[0]), strings.Join([]string{
 		"09:00 - 10:00 Minecraft chore/get-started",
@@ -211,7 +147,7 @@ func TestAFKIsShownButNotCounted(t *testing.T) {
 func TestLunchBreakBelongsToNoSession(t *testing.T) {
 	recs := records("2026-11-12", "09:00 Minecraft main", "12:10 Minecraft main", "14:00 Minecraft main")
 	recs[1] = record.Record{Time: recs[1].Time, Event: record.Lunch}
-	days := Build(recs, Rules{DayStart: 9 * time.Hour, LunchStart: NoLunch, LunchEnd: NoLunch})
+	days := Build(recs)
 
 	if got, want := timetable(days[0]), "09:00 - 12:10 Minecraft main\n12:10 - 14:00 Lunch break "; got != want {
 		t.Errorf("got\n%q\nwant\n%q", got, want)
@@ -223,5 +159,15 @@ func TestLunchBreakBelongsToNoSession(t *testing.T) {
 		if s.Session == LunchBreak {
 			t.Error("a lunch break should not be a session in the pie")
 		}
+	}
+}
+
+func TestDaysRunFromTheFirstRecordToTheLast(t *testing.T) {
+	days := Build(records("2026-11-12", "08:30 A x", "12:15 A y", "19:00 A y"))
+	if got, want := timetable(days[0]), "08:30 - 12:15 A x\n12:15 - 19:00 A y"; got != want {
+		t.Errorf("got\n%s\nwant\n%s", got, want)
+	}
+	if Hours(days[0].Total()) != "10:30" {
+		t.Errorf("total %s, want 10:30", Hours(days[0].Total()))
 	}
 }

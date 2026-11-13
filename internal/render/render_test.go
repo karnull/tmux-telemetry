@@ -49,10 +49,11 @@ func TestTimelineMarksLunchAndWork(t *testing.T) {
 	theme := NewTheme(false, sessions)
 	day := sheet.Day{Entries: []sheet.Entry{
 		{Work: sheet.Work{Session: "A"}, Start: 9 * time.Hour, End: 12 * time.Hour},
+		{Work: sheet.Work{Session: sheet.LunchBreak, Break: true}, Start: 12 * time.Hour, End: 13 * time.Hour},
 		{Work: sheet.Work{Session: "B"}, Start: 13 * time.Hour, End: 17 * time.Hour},
 	}}
 	span := Span{From: 9 * time.Hour, To: 17 * time.Hour}
-	got := Timeline(theme, day, sheet.DefaultRules, span, 8)
+	got := Timeline(theme, day, span, 8)
 	want := strings.Repeat(theme.Glyph("A"), 3) + "·" + strings.Repeat(theme.Glyph("B"), 4)
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -90,7 +91,16 @@ func TestAFKIsShownButNotShared(t *testing.T) {
 		}
 	}
 	span := Span{From: 9 * time.Hour, To: 11 * time.Hour}
-	if got := Timeline(theme, day, sheet.DefaultRules, span, 2); got != theme.Glyph("A")+"z" {
+	if got := Timeline(theme, day, span, 2); got != theme.Glyph("A")+"z" {
 		t.Errorf("timeline got %q", got)
+	}
+}
+
+func TestSpanCoversALongDay(t *testing.T) {
+	day := sheet.Day{Entries: []sheet.Entry{
+		{Work: sheet.Work{Session: "A"}, Start: 8*time.Hour + 30*time.Minute, End: 18*time.Hour + 40*time.Minute},
+	}}
+	if span := SpanOf([]sheet.Day{day}); span.From != 8*time.Hour || span.To != 19*time.Hour {
+		t.Errorf("got %s to %s, want 08:00 to 19:00", sheet.Clock(span.From), sheet.Clock(span.To))
 	}
 }
