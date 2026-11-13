@@ -136,6 +136,8 @@ status 2, and any other failure with 1. `timesheet completion zsh` (or `bash`,
   and straight back leaves one stretch, and passing through just before a detach
   or the end of the day isn't counted.
 * Detaching tmux counts as away until the next record.
+* The totals table keeps each session's rows together, the sessions longest first
+  and their work longest first within each.
 * AFK and lunch breaks show in the totals table, the timetables and the timeline,
   AFK as a faint `z` and lunch as faint dots, but are left out of each session's
   total, the pie chart and every day's total. JSON and CSV mark them with
