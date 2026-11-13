@@ -70,6 +70,9 @@ func (t Theme) Paint(session, text string) string {
 
 func (t Theme) style() lipgloss.Style { return lipgloss.NewStyle() }
 
+// Heading is text set bold, as a report's title is.
+func (t Theme) Heading(s string) string { return t.bold(s) }
+
 func (t Theme) bold(s string) string {
 	if !t.Colour {
 		return s

@@ -104,3 +104,51 @@ func TestSpanCoversALongDay(t *testing.T) {
 		t.Errorf("got %s to %s, want 08:00 to 19:00", sheet.Clock(span.From), sheet.Clock(span.To))
 	}
 }
+
+func TestDetailListsEveryStretch(t *testing.T) {
+	theme := NewTheme(false, sessions)
+	day := func(d int, entries ...sheet.Entry) sheet.Day {
+		return sheet.Day{Date: time.Date(2026, 11, d, 0, 0, 0, 0, time.UTC), Entries: entries}
+	}
+	entry := func(session, context string, from, to time.Duration) sheet.Entry {
+		return sheet.Entry{Work: sheet.Work{Session: session, Context: context}, Start: from, End: to}
+	}
+	days := []sheet.Day{
+		day(9, entry("A", "x", 9*time.Hour, 12*time.Hour+35*time.Minute), entry("B", "y", 12*time.Hour+35*time.Minute, 13*time.Hour),
+			entry("A", "x", 13*time.Hour, 17*time.Hour+45*time.Minute)),
+		day(10, entry("A", "z", 9*time.Hour, 10*time.Hour)),
+	}
+
+	text := DetailText(Detail(theme, days, sheet.Selection{Session: "a", Context: "X"}, 80))
+	for _, want := range []string{"A · x", "8:20 over 1 day(s), in 2 stretch(es)", "09:00 - 12:35", "13:00 - 17:45", "Longest 4:45"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("missing %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "Tue 10/11") {
+		t.Errorf("a day without the work should not show:\n%s", text)
+	}
+
+	lines := Detail(theme, days, sheet.Selection{Session: "A"}, 80)
+	var picks []string
+	for _, l := range lines {
+		if l.Select != nil {
+			picks = append(picks, l.Select.Title())
+		}
+	}
+	if len(picks) < 2 || picks[0] != "A · x" || picks[1] != "A · z" {
+		t.Errorf("a session's detail should offer each of its work to open, got %v", picks)
+	}
+}
+
+func TestHighlightMarksOnlyTheSelection(t *testing.T) {
+	theme := NewTheme(false, sessions)
+	day := sheet.Day{Entries: []sheet.Entry{
+		{Work: sheet.Work{Session: "A", Context: "x"}, Start: 9 * time.Hour, End: 10 * time.Hour},
+		{Work: sheet.Work{Session: "B", Context: "y"}, Start: 10 * time.Hour, End: 11 * time.Hour},
+	}}
+	got := Highlight(theme, day, sheet.Selection{Session: "B"}, Span{From: 9 * time.Hour, To: 11 * time.Hour}, 2)
+	if got != "─"+theme.Glyph("B") {
+		t.Errorf("got %q", got)
+	}
+}

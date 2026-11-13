@@ -175,6 +175,29 @@ func TestTextReport(t *testing.T) {
 	}
 }
 
+func TestSessionAndWorkNarrowTheReport(t *testing.T) {
+	out, _, err := execute(t, nil, "-s", "2026-11-10", "-u", "2026-11-10", "--session", "roblox")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Roblox", "08:40 - 12:30", "3:50 over 1 day(s), in 1 stretch(es)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "Minecraft") {
+		t.Errorf("only Roblox should show:\n%s", out)
+	}
+
+	out, _, err = execute(t, nil, "-s", "2026-11-10", "-u", "2026-11-10", "--work", "chore/get-started", "-f", "csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(out, "\n") != 2 || !strings.Contains(out, "Minecraft,chore/get-started") {
+		t.Errorf("csv should hold just the one entry:\n%s", out)
+	}
+}
+
 func TestInteractiveNeedsATerminal(t *testing.T) {
 	if _, _, err := execute(t, nil, "-i"); !IsUsage(err) {
 		t.Errorf("-i without a terminal: got %v", err)

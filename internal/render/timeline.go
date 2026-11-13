@@ -54,33 +54,59 @@ func Axis(t Theme, span Span, width int) string {
 // Timeline draws a day as a bar, each cell showing the session that held it longest.
 // AFK shows as a faint z, and a lunch break as faint dots.
 func Timeline(t Theme, day sheet.Day, span Span, width int) string {
-	if width < 1 {
-		return ""
-	}
-	cell := (span.To - span.From) / time.Duration(width)
-	var b strings.Builder
-	for i := 0; i < width; i++ {
-		from := span.From + time.Duration(i)*cell
-		to := from + cell
-		var best sheet.Entry
-		held := time.Duration(0)
-		for _, e := range day.Entries {
-			if overlap := min(to, e.End) - max(from, e.Start); overlap > held {
-				best, held = e, overlap
-			}
+	return cells(t, day, span, width, func(e sheet.Entry) string { return mark(t, e) })
+}
+
+// Highlight draws a day as Timeline does, but marks only the selected work, with
+// the rest of the day faint behind it.
+func Highlight(t Theme, day sheet.Day, sel sheet.Selection, span Span, width int) string {
+	return cells(t, day, span, width, func(e sheet.Entry) string {
+		if sel.Matches(e.Work) {
+			return mark(t, e)
 		}
-		switch {
-		case held > 0 && best.Break == sheet.LunchBreak:
-			b.WriteString(t.faint("·"))
-		case held > 0 && !best.Counted():
-			b.WriteString(t.faint("z"))
-		case held > 0:
-			b.WriteString(t.Paint(best.Session, t.Glyph(best.Session)))
-		default:
+		return t.faint("─")
+	})
+}
+
+func mark(t Theme, e sheet.Entry) string {
+	switch e.Break {
+	case sheet.LunchBreak:
+		return t.faint("·")
+	case sheet.AFKBreak:
+		return t.faint("z")
+	}
+	return t.Paint(e.Session, t.Glyph(e.Session))
+}
+
+// cells fills each cell with the glyph of the entry that held it longest
+func cells(t Theme, day sheet.Day, span Span, width int, glyph func(sheet.Entry) string) string {
+	var b strings.Builder
+	for x := 0; x < width; x++ {
+		if e, ok := At(day, span, width, x); ok {
+			b.WriteString(glyph(e))
+		} else {
 			b.WriteString(" ")
 		}
 	}
 	return b.String()
+}
+
+// At is the entry holding the cell at column x of a timeline, if any.
+func At(day sheet.Day, span Span, width, x int) (sheet.Entry, bool) {
+	if width < 1 || x < 0 || x >= width {
+		return sheet.Entry{}, false
+	}
+	cell := (span.To - span.From) / time.Duration(width)
+	from := span.From + time.Duration(x)*cell
+	to := from + cell
+	var best sheet.Entry
+	held := time.Duration(0)
+	for _, e := range day.Entries {
+		if overlap := min(to, e.End) - max(from, e.Start); overlap > held {
+			best, held = e, overlap
+		}
+	}
+	return best, held > 0
 }
 
 // Timelines stacks a row for each day under one axis, with each day's total.
