@@ -10,32 +10,47 @@ import (
 	"github.com/karnull/tmux-telemetry/internal/record"
 )
 
+// Break is time that belongs to no session and is never counted.
+type Break int
+
+const (
+	NoBreak Break = iota
+	LunchBreak
+	AFKBreak
+)
+
+// Name is what a break shows in place of a session.
+func (b Break) Name() string {
+	return [...]string{"", "Lunch break", "AFK"}[b]
+}
+
+// AFK is the label for time away from the keyboard.
+const AFK = "AFK"
+
 // Work is what a stretch of time went on: a session, and a branch or folder in it,
-// or a lunch break, which belongs to no session.
+// or a break, which belongs to no session.
 type Work struct {
 	Session string
 	Context string
-	Break   bool
+	Break   Break
 }
 
-// AFK is the label for time away from the keyboard: shown, but never counted.
-const AFK = "AFK"
-
-// LunchBreak names a lunch break where a session would go.
-const LunchBreak = "Lunch break"
+func breakWork(b Break) Work { return Work{Session: b.Name(), Break: b} }
 
 // Settle is how long a stretch has to last to count as somewhere.
 const Settle = time.Minute
 
 // passingThrough says whether the work is only on the way somewhere: the home
 // folder, recorded as no folder, or as ~ by older versions.
-func (w Work) passingThrough() bool { return !w.Break && (w.Context == "" || w.Context == "~") }
+func (w Work) passingThrough() bool {
+	return w.Break == NoBreak && (w.Context == "" || w.Context == "~")
+}
 
 // IsAFK says whether the time was spent away from the keyboard.
-func (w Work) IsAFK() bool { return !w.Break && strings.EqualFold(w.Context, AFK) }
+func (w Work) IsAFK() bool { return w.Break == AFKBreak }
 
-// Counted says whether the time goes into totals, which AFK and lunch don't.
-func (w Work) Counted() bool { return !w.Break && !w.IsAFK() }
+// Counted says whether the time goes into totals, which breaks don't.
+func (w Work) Counted() bool { return w.Break == NoBreak }
 
 // Entry is one stretch of work in a day, as time since that day's midnight.
 type Entry struct {
@@ -68,7 +83,7 @@ func (d Day) Total() time.Duration {
 func (d Day) Away() time.Duration { return d.sum(func(w Work) bool { return w.IsAFK() }) }
 
 // Breaks is the lunch break time in a day.
-func (d Day) Breaks() time.Duration { return d.sum(func(w Work) bool { return w.Break }) }
+func (d Day) Breaks() time.Duration { return d.sum(func(w Work) bool { return w.Break == LunchBreak }) }
 
 func (d Day) sum(include func(Work) bool) time.Duration {
 	var total time.Duration
@@ -118,8 +133,12 @@ func buildDay(records []record.Record) []Entry {
 	for _, rec := range records {
 		t := clock(rec.Time)
 		w := Work{Session: rec.Session, Context: rec.Context}
-		if rec.Event == record.Lunch {
-			w = Work{Session: LunchBreak, Break: true}
+		// AFK belongs to no project, including when older versions recorded it as one's context
+		switch {
+		case rec.Event == record.Lunch:
+			w = breakWork(LunchBreak)
+		case rec.Event == record.AFK, strings.EqualFold(rec.Context, AFK):
+			w = breakWork(AFKBreak)
 		}
 		away := rec.Event == record.Away
 		if len(runs) == 0 || runs[len(runs)-1].away != away || runs[len(runs)-1].work != w {

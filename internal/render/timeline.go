@@ -70,7 +70,7 @@ func Timeline(t Theme, day sheet.Day, span Span, width int) string {
 			}
 		}
 		switch {
-		case held > 0 && best.Break:
+		case held > 0 && best.Break == sheet.LunchBreak:
 			b.WriteString(t.faint("·"))
 		case held > 0 && !best.Counted():
 			b.WriteString(t.faint("z"))

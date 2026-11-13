@@ -49,7 +49,7 @@ func TestTimelineMarksLunchAndWork(t *testing.T) {
 	theme := NewTheme(false, sessions)
 	day := sheet.Day{Entries: []sheet.Entry{
 		{Work: sheet.Work{Session: "A"}, Start: 9 * time.Hour, End: 12 * time.Hour},
-		{Work: sheet.Work{Session: sheet.LunchBreak, Break: true}, Start: 12 * time.Hour, End: 13 * time.Hour},
+		{Work: sheet.Work{Session: sheet.LunchBreak.Name(), Break: sheet.LunchBreak}, Start: 12 * time.Hour, End: 13 * time.Hour},
 		{Work: sheet.Work{Session: "B"}, Start: 13 * time.Hour, End: 17 * time.Hour},
 	}}
 	span := Span{From: 9 * time.Hour, To: 17 * time.Hour}
@@ -79,10 +79,10 @@ func TestAFKIsShownButNotShared(t *testing.T) {
 	theme := NewTheme(false, sessions)
 	day := sheet.Day{Entries: []sheet.Entry{
 		{Work: sheet.Work{Session: "A", Context: "x"}, Start: 9 * time.Hour, End: 10 * time.Hour},
-		{Work: sheet.Work{Session: "A", Context: "AFK"}, Start: 10 * time.Hour, End: 11 * time.Hour},
+		{Work: sheet.Work{Session: sheet.AFKBreak.Name(), Break: sheet.AFKBreak}, Start: 10 * time.Hour, End: 11 * time.Hour},
 	}}
 	table := Totals(theme, sheet.Totals([]sheet.Day{day}), day.Total())
-	if !strings.Contains(table, NotCounted) || !strings.Contains(table, "| AFK ") {
+	if !strings.Contains(table, NotCounted) || !strings.Contains(table, "AFK") {
 		t.Errorf("AFK should be listed as not counted:\n%s", table)
 	}
 	for _, line := range strings.Split(table, "\n") {
