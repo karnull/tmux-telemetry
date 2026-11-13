@@ -24,6 +24,13 @@ const AFK = "AFK"
 // LunchBreak names a lunch break where a session would go.
 const LunchBreak = "Lunch break"
 
+// Settle is how long a stretch has to last to count as somewhere.
+const Settle = time.Minute
+
+// passingThrough says whether the work is only on the way somewhere: the home
+// folder, recorded as no folder, or as ~ by older versions.
+func (w Work) passingThrough() bool { return !w.Break && (w.Context == "" || w.Context == "~") }
+
 // IsAFK says whether the time was spent away from the keyboard.
 func (w Work) IsAFK() bool { return !w.Break && strings.EqualFold(w.Context, AFK) }
 
@@ -102,7 +109,9 @@ func clock(t time.Time) time.Duration {
 }
 
 // Records in a row for the same work make one run, which lasts until the next run
-// starts; the last run of the day ends at the day's last record.
+// starts; the last run of the day ends at the day's last record. A run at home, or
+// one shorter than Settle, hands its start to the next run that settles, and is
+// dropped when tmux is detached or the day ends first.
 func buildDay(records []record.Record) []Entry {
 	var runs []run
 	var last time.Duration
@@ -120,15 +129,33 @@ func buildDay(records []record.Record) []Entry {
 	}
 
 	var entries []Entry
+	pending, waiting := time.Duration(0), false
 	for i, r := range runs {
 		end := last
 		if i+1 < len(runs) {
 			end = runs[i+1].start
 		}
-		if r.away || end <= r.start {
+		if r.away {
+			waiting = false
 			continue
 		}
-		entries = append(entries, Entry{Work: r.work, Start: r.start, End: end})
+		if r.work.passingThrough() || end-r.start < Settle {
+			if !waiting {
+				pending, waiting = r.start, true
+			}
+			continue
+		}
+
+		start := r.start
+		if waiting {
+			start, waiting = pending, false
+		}
+		// a hop away and straight back leaves one stretch, not two
+		if n := len(entries); n > 0 && entries[n-1].Work == r.work && entries[n-1].End == start {
+			entries[n-1].End = end
+			continue
+		}
+		entries = append(entries, Entry{Work: r.work, Start: start, End: end})
 	}
 	return entries
 }

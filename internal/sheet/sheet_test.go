@@ -11,12 +11,16 @@ import (
 
 var melbourne = time.FixedZone("AEDT", 11*60*60)
 
-// records takes "HH:MM session context" lines, with a bare time for away
+// records takes "HH:MM[:SS] session context" lines, with a bare time for away
 func records(day string, lines ...string) []record.Record {
 	var out []record.Record
 	for _, line := range lines {
 		fields := strings.SplitN(line, " ", 3)
-		t, err := time.ParseInLocation("2006-01-02 15:04", day+" "+fields[0], melbourne)
+		layout := "2006-01-02 15:04"
+		if len(fields[0]) > 5 {
+			layout += ":05"
+		}
+		t, err := time.ParseInLocation(layout, day+" "+fields[0], melbourne)
 		if err != nil {
 			panic(err)
 		}
@@ -169,5 +173,40 @@ func TestDaysRunFromTheFirstRecordToTheLast(t *testing.T) {
 	}
 	if Hours(days[0].Total()) != "10:30" {
 		t.Errorf("total %s, want 10:30", Hours(days[0].Total()))
+	}
+}
+
+func TestHomeHandsItsTimeOn(t *testing.T) {
+	recs := records("2026-11-12", "09:00 A ~", "09:20 A feat/x", "10:00 A feat/x")
+	recs[0].Context = ""
+	days := Build(append(recs, records("2026-11-12", "10:30 A ~", "11:00 A ~")...))
+	if got, want := timetable(days[0]), "09:00 - 10:30 A feat/x"; got != want {
+		t.Errorf("time at home should go to where the work went next, and home at the end of the day nowhere:\ngot  %q\nwant %q", got, want)
+	}
+}
+
+func TestShortStopsHandTheirTimeOn(t *testing.T) {
+	days := Build(records("2026-11-12",
+		"09:00 A x",
+		"10:00:00 B y",
+		"10:00:30 C z",
+		"11:00 C z",
+	))
+	if got, want := timetable(days[0]), "09:00 - 10:00 A x\n10:00 - 11:00 C z"; got != want {
+		t.Errorf("half a minute in B should go to C:\ngot\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestAHopAndBackIsOneStretch(t *testing.T) {
+	days := Build(records("2026-11-12", "09:00 A x", "10:00 B y", "10:00:20 A x", "11:00 A x"))
+	if got, want := timetable(days[0]), "09:00 - 11:00 A x"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestShortStopsBeforeDetachingAreDropped(t *testing.T) {
+	days := Build(records("2026-11-12", "17:00 A x", "18:00 A ~", "18:30", "19:00 B y", "19:00:30 C z", "19:00:40"))
+	if got, want := timetable(days[0]), "17:00 - 18:00 A x"; got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }
