@@ -49,6 +49,7 @@ step send -t Other 'true' Enter
 step switch-client -c "$(tmux list-clients -F '#{client_name}' | head -n 1)" -t Other
 step send -t Other 'cd /' Enter
 step send -t Other "cd $SCRATCH/Widget" Enter
+step send -t Other 'cd ~' Enter
 attach popup; sleep 2
 step send -t popup 'true' Enter
 step detach-client -s popup
@@ -71,6 +72,7 @@ expected=$(printf '%s\n' \
     "focus,Other,$SCRATCH/plain" \
     'focus,Other,/' \
     'focus,Other,Widget' \
+    'focus,Other,' \
     'focus,Work,feat/test' \
     'focus,Work,Meeting' \
     'focus,Work,External' \

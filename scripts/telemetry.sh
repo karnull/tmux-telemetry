@@ -80,9 +80,12 @@ label() {
 }
 
 # <path> <trunk>: the branch checked out, or the folder outside git; the trunk
-# branch says nothing about the work, so its folder name stands in
+# branch says nothing about the work, so its folder name stands in. The home
+# folder is only passed through, so it records nothing, and timesheet gives its
+# time to wherever the work goes next.
 work() {
     local branch
+    [[ "$1" == "$HOME" ]] && return
     if branch=$(git -C "$1" symbolic-ref --short -q HEAD 2>/dev/null); then
         [[ " ${2:-main master} " == *" $branch "* ]] && branch="${1##*/}"
         echo "$branch"
