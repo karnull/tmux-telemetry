@@ -7,7 +7,8 @@ TELEMETRY="$CURRENT_DIR/scripts/telemetry.sh"
 tmux set-environment -g TELEMETRY_HOME "$CURRENT_DIR"
 
 # a fixed index, so reloading the config replaces the hooks rather than stacking them
-for hook in client-session-changed session-window-changed after-select-pane client-attached; do
+# window-renamed catches a window renamed to a label, with no prompt needed
+for hook in client-session-changed session-window-changed after-select-pane client-attached window-renamed; do
     tmux set-hook -g "$hook[42]" "run-shell -b '$TELEMETRY record #{pane_id}'"
 done
 tmux set-hook -g 'client-detached[42]' "run-shell -b '$TELEMETRY away'"

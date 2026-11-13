@@ -8,6 +8,7 @@ shift
 
 LOGS="${TELEMETRY_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/telemetry}"
 HEADER="timestamp,event,session,context"
+LABELS="Bench AFK Research Meeting Hardware"
 
 
 show_help() {
@@ -15,7 +16,7 @@ cat <<'EOF'
 Usage: telemetry [action]
 
 Actions:
-  record <PANE>   log the session and branch or folder of a tmux pane
+  record <PANE>   log the session, and the window's label or else the branch or folder
   away            log that tmux was detached
   migrate         convert daily .tsv records from older versions to monthly .csv
 
@@ -61,24 +62,46 @@ append() {
     write_row "$(now)" "$@"
 }
 
+# a window named for an activity, in any case, is what the time went on, whatever
+# the pane shows; !meeting is an internal meeting, which goes down as External
+label() {
+    local window=${1,,} label
+    if [[ "$window" == "!meeting" ]]; then
+        echo External
+        return
+    fi
+    for label in ${2:-$LABELS}; do
+        if [[ "$window" == "${label,,}" ]]; then
+            echo "$label"
+            return
+        fi
+    done
+    return 1
+}
+
+# <path> <trunk>: the branch checked out, or the folder outside git; the trunk
+# branch says nothing about the work, so its folder name stands in
+work() {
+    local branch
+    if branch=$(git -C "$1" symbolic-ref --short -q HEAD 2>/dev/null); then
+        [[ " ${2:-main master} " == *" $branch "* ]] && branch="${1##*/}"
+        echo "$branch"
+    else
+        git -C "$1" rev-parse --short HEAD 2>/dev/null || echo "${1/#$HOME/\~}"
+    fi
+}
+
 # only the pane in focus counts, so background panes finishing a command don't
 record_pane() {
-    local active session path ignore trunk context
-    # read folds runs of tabs together, so options that may be empty carry a leading =
-    IFS=$'\t' read -r active session path ignore trunk < <(tmux display-message -p -t "$1" \
-        '#{&&:#{session_attached},#{&&:#{window_active},#{pane_active}}}	#{session_name}	#{pane_current_path}	=#{@telemetry-ignore}	=#{@telemetry-trunk}')
-    ignore=${ignore#=} trunk=${trunk#=}
+    local active session path ignore trunk window labels context
+    # read folds runs of tabs together, so fields that may be empty carry a leading =
+    IFS=$'\t' read -r active session path ignore trunk labels window < <(tmux display-message -p -t "$1" \
+        '#{&&:#{session_attached},#{&&:#{window_active},#{pane_active}}}	#{session_name}	#{pane_current_path}	=#{@telemetry-ignore}	=#{@telemetry-trunk}	=#{@telemetry-labels}	=#{window_name}')
+    ignore=${ignore#=} trunk=${trunk#=} labels=${labels#=} window=${window#=}
 
     [[ "$active" == 1 && -n "$session" && " $ignore " != *" $session "* ]] || return 0
 
-    # the trunk branch says nothing about the work, so its folder name stands in
-    if context=$(git -C "$path" symbolic-ref --short -q HEAD 2>/dev/null); then
-        [[ " ${trunk:-main master} " == *" $context "* ]] && context="${path##*/}"
-    else
-        context=$(git -C "$path" rev-parse --short HEAD 2>/dev/null) ||
-            context="${path/#$HOME/\~}"
-    fi
-
+    context=$(label "$window" "$labels") || context=$(work "$path" "$trunk")
     append focus "$session" "$context"
 }
 

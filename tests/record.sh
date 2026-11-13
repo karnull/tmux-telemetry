@@ -32,7 +32,7 @@ import os, pty, sys, time
 pid, fd = pty.fork()
 if pid == 0:
     os.execvp("tmux", ["tmux", "attach", "-t", sys.argv[1]])
-end = time.time() + 20
+end = time.time() + 30
 while time.time() < end:
     try:
         os.read(fd, 65536)
@@ -53,6 +53,10 @@ attach popup; sleep 2
 step send -t popup 'true' Enter
 step detach-client -s popup
 step switch-client -t Work
+step rename-window -t Work: MEETING
+step rename-window -t Work: '!Meeting'
+step rename-window -t Work: afk
+step rename-window -t Work: notes
 # a trunk set with no ignore list must still be read as the trunk
 step set -gu @telemetry-ignore
 step set -g @telemetry-trunk feat/test
@@ -66,6 +70,10 @@ expected=$(printf '%s\n' \
     "focus,Other,$SCRATCH/plain" \
     'focus,Other,/' \
     'focus,Other,Widget' \
+    'focus,Work,feat/test' \
+    'focus,Work,Meeting' \
+    'focus,Work,External' \
+    'focus,Work,AFK' \
     'focus,Work,feat/test' \
     'focus,Work,repo' \
     'away,,')
