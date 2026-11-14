@@ -16,7 +16,8 @@ cat <<'EOF'
 Usage: telemetry [action]
 
 Actions:
-  record <PANE>   log the session, and the window's label or else the branch or folder
+  record <PANE>   log the session, and the window's label or else the branch or folder;
+                  a window named lunch logs a lunch break
   away            log that tmux was detached
 
 Notes:
@@ -79,9 +80,12 @@ label() {
 }
 
 # <path> <trunk>: the branch checked out, or the folder outside git; the trunk
-# branch says nothing about the work, so its folder name stands in
+# branch says nothing about the work, so its folder name stands in. The home
+# folder is only passed through, so it records nothing, and timesheet gives its
+# time to wherever the work goes next.
 work() {
     local branch
+    [[ "$1" == "$HOME" ]] && return
     if branch=$(git -C "$1" symbolic-ref --short -q HEAD 2>/dev/null); then
         [[ " ${2:-main master} " == *" $branch "* ]] && branch="${1##*/}"
         echo "$branch"
@@ -99,6 +103,12 @@ record_pane() {
     ignore=${ignore#=} trunk=${trunk#=} labels=${labels#=} window=${window#=}
 
     [[ "$active" == 1 && -n "$session" && " $ignore " != *" $session "* ]] || return 0
+
+    # lunch belongs to no project, so it goes down without the session
+    if [[ "${window,,}" == lunch ]]; then
+        append lunch "" ""
+        return
+    fi
 
     context=$(label "$window" "$labels") || context=$(work "$path" "$trunk")
     append focus "$session" "$context"

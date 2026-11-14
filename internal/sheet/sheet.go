@@ -10,60 +10,32 @@ import (
 	"github.com/karnull/tmux-telemetry/internal/record"
 )
 
-// Rules shape the working day: when it starts, and the lunch left out of it.
-type Rules struct {
-	DayStart   time.Duration
-	LunchStart time.Duration
-	LunchEnd   time.Duration
-}
-
-// DefaultRules start the day at nine and leave out twelve to one.
-var DefaultRules = Rules{DayStart: 9 * time.Hour, LunchStart: 12 * time.Hour, LunchEnd: 13 * time.Hour}
-
-// NoLunch sits past the end of any day, so nothing is ever cut for it.
-const NoLunch = 24 * time.Hour
-
-// ParseClock reads HH:MM as time since midnight.
-func ParseClock(s string) (time.Duration, error) {
-	t, err := time.Parse("15:04", s)
-	if err != nil {
-		return 0, fmt.Errorf("%q is not a time of day as HH:MM", s)
-	}
-	return time.Duration(t.Hour())*time.Hour + time.Duration(t.Minute())*time.Minute, nil
-}
-
-// ParseLunch reads HH:MM-HH:MM, or none.
-func ParseLunch(s string) (start, end time.Duration, err error) {
-	if strings.EqualFold(s, "none") {
-		return NoLunch, NoLunch, nil
-	}
-	from, to, ok := strings.Cut(s, "-")
-	if !ok {
-		return 0, 0, fmt.Errorf("%q is not a lunch as HH:MM-HH:MM, or none", s)
-	}
-	if start, err = ParseClock(from); err != nil {
-		return 0, 0, err
-	}
-	if end, err = ParseClock(to); err != nil {
-		return 0, 0, err
-	}
-	if end <= start {
-		return 0, 0, fmt.Errorf("lunch %q ends before it starts", s)
-	}
-	return start, end, nil
-}
-
-// Work is what a stretch of time went on: a session, and a branch or folder in it.
+// Work is what a stretch of time went on: a session, and a branch or folder in it,
+// or a lunch break, which belongs to no session.
 type Work struct {
 	Session string
 	Context string
+	Break   bool
 }
 
 // AFK is the label for time away from the keyboard: shown, but never counted.
 const AFK = "AFK"
 
-// Counted says whether the time goes into totals, which AFK time doesn't.
-func (w Work) Counted() bool { return !strings.EqualFold(w.Context, AFK) }
+// LunchBreak names a lunch break where a session would go.
+const LunchBreak = "Lunch break"
+
+// Settle is how long a stretch has to last to count as somewhere.
+const Settle = time.Minute
+
+// passingThrough says whether the work is only on the way somewhere: the home
+// folder, recorded as no folder, or as ~ by older versions.
+func (w Work) passingThrough() bool { return !w.Break && (w.Context == "" || w.Context == "~") }
+
+// IsAFK says whether the time was spent away from the keyboard.
+func (w Work) IsAFK() bool { return !w.Break && strings.EqualFold(w.Context, AFK) }
+
+// Counted says whether the time goes into totals, which AFK and lunch don't.
+func (w Work) Counted() bool { return !w.Break && !w.IsAFK() }
 
 // Entry is one stretch of work in a day, as time since that day's midnight.
 type Entry struct {
@@ -93,18 +65,24 @@ func (d Day) Total() time.Duration {
 }
 
 // Away is the AFK time in a day.
-func (d Day) Away() time.Duration {
-	var away time.Duration
+func (d Day) Away() time.Duration { return d.sum(func(w Work) bool { return w.IsAFK() }) }
+
+// Breaks is the lunch break time in a day.
+func (d Day) Breaks() time.Duration { return d.sum(func(w Work) bool { return w.Break }) }
+
+func (d Day) sum(include func(Work) bool) time.Duration {
+	var total time.Duration
 	for _, e := range d.Entries {
-		if !e.Counted() {
-			away += e.Duration()
+		if include(e.Work) {
+			total += e.Duration()
 		}
 	}
-	return away
+	return total
 }
 
-// Build splits records into days and turns each day into entries.
-func Build(records []record.Record, rules Rules) []Day {
+// Build splits records into days and turns each day into entries. A day runs from
+// its first record to its last, whatever the clock says.
+func Build(records []record.Record) []Day {
 	var days []Day
 	for start := 0; start < len(records); {
 		date := record.DateOf(records[start].Time)
@@ -112,7 +90,7 @@ func Build(records []record.Record, rules Rules) []Day {
 		for end < len(records) && record.DateOf(records[end].Time).Equal(date) {
 			end++
 		}
-		if entries := buildDay(records[start:end], rules); len(entries) > 0 {
+		if entries := buildDay(records[start:end]); len(entries) > 0 {
 			days = append(days, Day{Date: date, Entries: entries})
 		}
 		start = end
@@ -131,48 +109,52 @@ func clock(t time.Time) time.Duration {
 }
 
 // Records in a row for the same work make one run, which lasts until the next run
-// starts; the last run of the day ends at the day's last record. Lunch always ends
-// a run, so work after it starts afresh at the first record back.
-func buildDay(records []record.Record, rules Rules) []Entry {
+// starts; the last run of the day ends at the day's last record. A run at home, or
+// one shorter than Settle, hands its start to the next run that settles, and is
+// dropped when tmux is detached or the day ends first.
+func buildDay(records []record.Record) []Entry {
 	var runs []run
 	var last time.Duration
-	for i, rec := range records {
+	for _, rec := range records {
 		t := clock(rec.Time)
 		w := Work{Session: rec.Session, Context: rec.Context}
+		if rec.Event == record.Lunch {
+			w = Work{Session: LunchBreak, Break: true}
+		}
 		away := rec.Event == record.Away
-		intoLunch := i > 0 && last < rules.LunchStart && t >= rules.LunchStart
-		if len(runs) == 0 || intoLunch || runs[len(runs)-1].away != away || runs[len(runs)-1].work != w {
+		if len(runs) == 0 || runs[len(runs)-1].away != away || runs[len(runs)-1].work != w {
 			runs = append(runs, run{work: w, away: away, start: t})
 		}
 		last = t
 	}
 
 	var entries []Entry
-	started := false
+	pending, waiting := time.Duration(0), false
 	for i, r := range runs {
-		if r.away {
-			continue
-		}
-		start, end := r.start, last
+		end := last
 		if i+1 < len(runs) {
 			end = runs[i+1].start
 		}
-
-		// the day starts at DayStart, even if the terminal came out later
-		if !started && start < rules.LunchStart {
-			start = rules.DayStart
-		}
-		start = max(start, rules.DayStart)
-		if start >= rules.LunchStart && start < rules.LunchEnd {
-			start = rules.LunchEnd
-		}
-		if start < rules.LunchStart && end > rules.LunchStart {
-			end = rules.LunchStart
-		}
-		if end <= start {
+		if r.away {
+			waiting = false
 			continue
 		}
-		started = true
+		if r.work.passingThrough() || end-r.start < Settle {
+			if !waiting {
+				pending, waiting = r.start, true
+			}
+			continue
+		}
+
+		start := r.start
+		if waiting {
+			start, waiting = pending, false
+		}
+		// a hop away and straight back leaves one stretch, not two
+		if n := len(entries); n > 0 && entries[n-1].Work == r.work && entries[n-1].End == start {
+			entries[n-1].End = end
+			continue
+		}
 		entries = append(entries, Entry{Work: r.work, Start: start, End: end})
 	}
 	return entries
@@ -235,6 +217,15 @@ func Away(days []Day) time.Duration {
 		away += d.Away()
 	}
 	return away
+}
+
+// Breaks is the lunch break time across all the days.
+func Breaks(days []Day) time.Duration {
+	var breaks time.Duration
+	for _, d := range days {
+		breaks += d.Breaks()
+	}
+	return breaks
 }
 
 // Hours shows a duration as H:MM, the way a timesheet does.

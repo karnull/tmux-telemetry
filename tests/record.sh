@@ -49,6 +49,7 @@ step send -t Other 'true' Enter
 step switch-client -c "$(tmux list-clients -F '#{client_name}' | head -n 1)" -t Other
 step send -t Other 'cd /' Enter
 step send -t Other "cd $SCRATCH/Widget" Enter
+step send -t Other 'cd ~' Enter
 attach popup; sleep 2
 step send -t popup 'true' Enter
 step detach-client -s popup
@@ -56,6 +57,7 @@ step switch-client -t Work
 step rename-window -t Work: MEETING
 step rename-window -t Work: '!Meeting'
 step rename-window -t Work: afk
+step rename-window -t Work: Lunch
 step rename-window -t Work: notes
 # a trunk set with no ignore list must still be read as the trunk
 step set -gu @telemetry-ignore
@@ -70,10 +72,12 @@ expected=$(printf '%s\n' \
     "focus,Other,$SCRATCH/plain" \
     'focus,Other,/' \
     'focus,Other,Widget' \
+    'focus,Other,' \
     'focus,Work,feat/test' \
     'focus,Work,Meeting' \
     'focus,Work,External' \
     'focus,Work,AFK' \
+    'lunch,,' \
     'focus,Work,feat/test' \
     'focus,Work,repo' \
     'away,,')

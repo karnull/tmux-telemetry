@@ -10,7 +10,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/karnull/tmux-telemetry/internal/period"
-	"github.com/karnull/tmux-telemetry/internal/sheet"
 )
 
 var now = time.Date(2026, 11, 12, 15, 0, 0, 0, time.UTC)
@@ -32,7 +31,6 @@ func newModel(t *testing.T) Model {
 	m := New(Config{
 		Dir:    dir,
 		Period: period.Containing(period.Week, time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)),
-		Rules:  sheet.DefaultRules,
 		Now:    func() time.Time { return now },
 	})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})

@@ -132,8 +132,8 @@ func TestUsageErrors(t *testing.T) {
 		"-u 2026-11-01",
 		"-s 2026-11-10 -u 2026-11-01",
 		"-s soon",
-		"--lunch 13:00-12:00",
-		"--day-start nine",
+		"--lunch 12:00-13:00",
+		"--day-start 09:00",
 		"-f xml",
 		"--colour sometimes",
 		"-x",
@@ -145,28 +145,13 @@ func TestUsageErrors(t *testing.T) {
 	}
 }
 
-func TestRulesFromEnvironmentAndFlags(t *testing.T) {
-	r := jsonReport(t, "-s", "2026-11-10", "-u", "2026-11-10")
-	if got := r.Days[0].Entries[0].Start; got != "09:00" {
-		t.Errorf("default day start: got %s", got)
-	}
-
-	out, _, err := execute(t, map[string]string{"TIMESHEET_DAY_START": "08:30", "TIMESHEET_LUNCH": "none"},
-		"-s", "2026-11-10", "-u", "2026-11-10", "-f", "csv")
+func TestDayRunsFromItsFirstRecord(t *testing.T) {
+	out, _, err := execute(t, nil, "-s", "2026-11-10", "-u", "2026-11-10", "-f", "csv")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "2026-11-10,08:30,12:30,Roblox") {
-		t.Errorf("the environment's day start and no lunch should give 08:30 to 12:30 for Roblox, up to the away:\n%s", out)
-	}
-
-	out, _, err = execute(t, map[string]string{"TIMESHEET_DAY_START": "08:30"},
-		"-s", "2026-11-10", "-u", "2026-11-10", "-f", "csv", "--day-start", "09:15")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "2026-11-10,09:15,12:00,Roblox") {
-		t.Errorf("--day-start should win over the environment:\n%s", out)
+	if !strings.Contains(out, "2026-11-10,08:40,12:30,Roblox") {
+		t.Errorf("the day should start at its first record and run to the away:\n%s", out)
 	}
 }
 
@@ -175,7 +160,7 @@ func TestTextReport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"Tue 10/11/2026", "Roblox", "release-1.0", "4:29", "09:00 - 12:00", "13:32 - 15:01"} {
+	for _, want := range []string{"Tue 10/11/2026", "Roblox", "release-1.0", "5:19", "08:40 - 12:30", "13:32 - 15:01"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("report is missing %q:\n%s", want, out)
 		}

@@ -15,15 +15,19 @@ func TestParseQuotingAndAway(t *testing.T) {
 2026-11-10T13:32:00+11:00,focus,Cyberpunk,"~/notes, drafts"
 timestamp,event,session,context
 2026-11-10T14:00:00+11:00,focus,Cyberpunk,"say ""hi"""
+2026-11-10T15:00:00+11:00,lunch,,
 `))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Skipped != 0 || len(got.Records) != 4 {
+	if got.Skipped != 0 || len(got.Records) != 5 {
 		t.Fatalf("got %d records, %d skipped", len(got.Records), got.Skipped)
 	}
 	if got.Records[1].Event != Away {
 		t.Errorf("second record should be away")
+	}
+	if got.Records[4].Event != Lunch {
+		t.Errorf("last record should be a lunch break")
 	}
 	if c := got.Records[2].Context; c != "~/notes, drafts" {
 		t.Errorf("context with a comma came back as %q", c)
