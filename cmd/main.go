@@ -15,6 +15,7 @@ import (
 	"os"
 	"runtime/debug"
 
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/fang"
 
 	"github.com/karnull/tmux-telemetry/internal/cli"
@@ -41,12 +42,26 @@ func printError(w io.Writer, _ fang.Styles, err error) {
 	}
 }
 
+// colours plain on the terminal's own background, rather than set in blocks
+func plainScheme(c lipgloss.LightDarkFunc) fang.ColorScheme {
+	scheme := fang.DefaultColorScheme(c)
+	scheme.Codeblock = lipgloss.NoColor{}
+	return scheme
+}
+
 func main() {
-	err := fang.Execute(context.Background(), cli.New(cli.System()),
+	// help pads its lines out to its width, which shows once copied or piped
+	out := cli.Trim(os.Stdout)
+	root := cli.New(cli.System())
+	root.SetOut(out)
+
+	err := fang.Execute(context.Background(), root,
 		fang.WithVersion(buildVersion()),
 		fang.WithNotifySignal(os.Interrupt),
 		fang.WithErrorHandler(printError),
+		fang.WithColorSchemeFunc(plainScheme),
 	)
+	_ = out.Flush()
 	switch {
 	case err == nil:
 	case cli.IsUsage(err):
