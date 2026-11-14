@@ -20,6 +20,7 @@ type keyMap struct {
 	EntryDown key.Binding
 	Open      key.Binding
 	Session   key.Binding
+	Fill      key.Binding
 	Back      key.Binding
 	Reload    key.Binding
 	Help      key.Binding
@@ -45,6 +46,7 @@ func newKeyMap() keyMap {
 		EntryDown: key.NewBinding(key.WithKeys("J", "shift+down"), key.WithHelp("J", "entry down")),
 		Open:      key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter/click", "every stretch of it")),
 		Session:   key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "its whole session")),
+		Fill:      key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "say where unattended time went")),
 		Back:      key.NewBinding(key.WithKeys("esc", "backspace"), key.WithHelp("esc", "back")),
 		Reload:    key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload")),
 		Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "more keys")),
@@ -61,6 +63,6 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.NextView, k.PrevView, k.Summary, k.Days, k.Timeline},
 		{k.Earlier, k.Later, k.Today, k.ByDay, k.ByWeek, k.ByMonth},
 		{k.Up, k.Down, k.EntryUp, k.EntryDown},
-		{k.Open, k.Session, k.Back, k.Reload, k.Help, k.Quit},
+		{k.Open, k.Session, k.Fill, k.Back, k.Reload, k.Help, k.Quit},
 	}
 }
