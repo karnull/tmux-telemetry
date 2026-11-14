@@ -30,11 +30,12 @@ type jsonEntry struct {
 }
 
 type jsonDay struct {
-	Date         string      `json:"date"`
-	Minutes      int         `json:"minutes"`
-	AFKMinutes   int         `json:"afk_minutes"`
-	LunchMinutes int         `json:"lunch_minutes"`
-	Entries      []jsonEntry `json:"entries"`
+	Date              string      `json:"date"`
+	Minutes           int         `json:"minutes"`
+	AFKMinutes        int         `json:"afk_minutes"`
+	LunchMinutes      int         `json:"lunch_minutes"`
+	UnattendedMinutes int         `json:"unattended_minutes"`
+	Entries           []jsonEntry `json:"entries"`
 }
 
 type jsonTotal struct {
@@ -46,13 +47,14 @@ type jsonTotal struct {
 }
 
 type jsonReport struct {
-	Period       jsonPeriod  `json:"period"`
-	Minutes      int         `json:"minutes"`
-	AFKMinutes   int         `json:"afk_minutes"`
-	LunchMinutes int         `json:"lunch_minutes"`
-	Days         []jsonDay   `json:"days"`
-	Totals       []jsonTotal `json:"totals"`
-	Sessions     []jsonTotal `json:"sessions"`
+	Period            jsonPeriod  `json:"period"`
+	Minutes           int         `json:"minutes"`
+	AFKMinutes        int         `json:"afk_minutes"`
+	LunchMinutes      int         `json:"lunch_minutes"`
+	UnattendedMinutes int         `json:"unattended_minutes"`
+	Days              []jsonDay   `json:"days"`
+	Totals            []jsonTotal `json:"totals"`
+	Sessions          []jsonTotal `json:"sessions"`
 }
 
 func minutes(d time.Duration) int { return int(d.Round(time.Minute) / time.Minute) }
@@ -70,8 +72,8 @@ func totals(list []sheet.Total, grand time.Duration) []jsonTotal {
 }
 
 // JSON writes the whole report, durations in minutes and dates as YYYY-MM-DD. AFK
-// and lunch breaks are listed with counted false, and left out of every total but
-// afk_minutes and lunch_minutes.
+// lunch breaks and unattended time are listed with counted false, and left out of
+// every total but afk_minutes, lunch_minutes and unattended_minutes.
 func JSON(w io.Writer, p period.Period, days []sheet.Day) error {
 	grand := sheet.Grand(days)
 	report := jsonReport{
@@ -81,15 +83,16 @@ func JSON(w io.Writer, p period.Period, days []sheet.Day) error {
 			Last:  p.Last.Format(time.DateOnly),
 			Title: p.Title(),
 		},
-		Minutes:      minutes(grand),
-		AFKMinutes:   minutes(sheet.Away(days)),
-		LunchMinutes: minutes(sheet.Breaks(days)),
-		Days:         []jsonDay{},
-		Totals:       totals(sheet.Totals(days), grand),
-		Sessions:     totals(sheet.Sessions(days), grand),
+		Minutes:           minutes(grand),
+		AFKMinutes:        minutes(sheet.Away(days)),
+		LunchMinutes:      minutes(sheet.Breaks(days)),
+		UnattendedMinutes: minutes(sheet.Unattended(days)),
+		Days:              []jsonDay{},
+		Totals:            totals(sheet.Totals(days), grand),
+		Sessions:          totals(sheet.Sessions(days), grand),
 	}
 	for _, d := range days {
-		day := jsonDay{Date: d.Date.Format(time.DateOnly), Minutes: minutes(d.Total()), AFKMinutes: minutes(d.Away()), LunchMinutes: minutes(d.Breaks()), Entries: []jsonEntry{}}
+		day := jsonDay{Date: d.Date.Format(time.DateOnly), Minutes: minutes(d.Total()), AFKMinutes: minutes(d.Away()), LunchMinutes: minutes(d.Breaks()), UnattendedMinutes: minutes(d.Unattended()), Entries: []jsonEntry{}}
 		for _, e := range d.Entries {
 			day.Entries = append(day.Entries, jsonEntry{
 				Start:   sheet.Clock(e.Start),

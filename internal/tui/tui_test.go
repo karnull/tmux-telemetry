@@ -65,6 +65,8 @@ func press(m Model, keys ...string) Model {
 			msg = tea.KeyPressMsg{Code: tea.KeyEscape}
 		case "enter":
 			msg = tea.KeyPressMsg{Code: tea.KeyEnter}
+		case "J", "K":
+			msg = tea.KeyPressMsg{Code: rune(k[0] + 32), Mod: tea.ModShift, Text: k}
 		default:
 			msg = tea.KeyPressMsg{Code: rune(k[0]), Text: k}
 		}
@@ -211,5 +213,43 @@ func TestDetailFromTheCommandLine(t *testing.T) {
 	m = settle(next.(Model), m.load())
 	if !strings.Contains(ansi.Strip(m.View().Content), "stretch(es)") {
 		t.Error("a selection from the command line should open on start")
+	}
+}
+
+func TestUnattendedCanBeFilledInLater(t *testing.T) {
+	dir := t.TempDir()
+	day := time.Date(2026, 11, 12, 0, 0, 0, 0, time.Local)
+	stamp := func(h, m int) string {
+		return day.Add(time.Duration(h)*time.Hour + time.Duration(m)*time.Minute).Format(time.RFC3339)
+	}
+	body := "timestamp,event,session,context\n" +
+		stamp(9, 0) + ",focus,Minecraft,main\n" +
+		stamp(10, 0) + ",idle,,\n" +
+		stamp(10, 30) + ",focus,Minecraft,main\n" +
+		stamp(11, 0) + ",focus,Minecraft,main\n"
+	if err := os.WriteFile(filepath.Join(dir, "2026-11.csv"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m := New(Config{Dir: dir, Period: period.Containing(period.Day, time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)), Now: func() time.Time { return now }})
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = settle(next.(Model), m.load())
+
+	m = press(m, "2", "J", "e")
+	if m.fill == nil {
+		t.Fatal("e on the unattended entry should ask where it went")
+	}
+	m = press(m, "m", "enter")
+	if m.fill != nil {
+		t.Error("enter should close the box")
+	}
+	d, _ := m.selectedDay()
+	if got := d.Entries[1]; got.Session != "Minecraft" || got.Context != "Meeting" || got.Start != 10*time.Hour {
+		t.Errorf("the spell should now be Minecraft's Meeting from 10:00, got %+v", got)
+	}
+
+	// an entry that isn't unattended has nothing to fill in
+	m = press(m, "K", "e")
+	if m.fill != nil {
+		t.Error("only an unattended entry should be filled in")
 	}
 }

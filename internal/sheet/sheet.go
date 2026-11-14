@@ -17,11 +17,13 @@ const (
 	NoBreak Break = iota
 	LunchBreak
 	AFKBreak
+	// UnattendedBreak is a quiet spell nobody has yet said where it went
+	UnattendedBreak
 )
 
 // Name is what a break shows in place of a session.
 func (b Break) Name() string {
-	return [...]string{"", "Lunch break", "AFK"}[b]
+	return [...]string{"", "Lunch break", "AFK", "UNATTENDED"}[b]
 }
 
 // AFK is the label for time away from the keyboard.
@@ -82,6 +84,11 @@ func (d Day) Total() time.Duration {
 // Away is the AFK time in a day.
 func (d Day) Away() time.Duration { return d.sum(func(w Work) bool { return w.IsAFK() }) }
 
+// Unattended is the time in a day nobody has yet said where it went.
+func (d Day) Unattended() time.Duration {
+	return d.sum(func(w Work) bool { return w.Break == UnattendedBreak })
+}
+
 // Breaks is the lunch break time in a day.
 func (d Day) Breaks() time.Duration { return d.sum(func(w Work) bool { return w.Break == LunchBreak }) }
 
@@ -139,6 +146,8 @@ func buildDay(records []record.Record) []Entry {
 			w = breakWork(LunchBreak)
 		case rec.Event == record.AFK, strings.EqualFold(rec.Context, AFK):
 			w = breakWork(AFKBreak)
+		case rec.Event == record.Idle:
+			w = breakWork(UnattendedBreak)
 		}
 		away := rec.Event == record.Away
 		if len(runs) == 0 || runs[len(runs)-1].away != away || runs[len(runs)-1].work != w {
@@ -252,6 +261,15 @@ func Away(days []Day) time.Duration {
 		away += d.Away()
 	}
 	return away
+}
+
+// Unattended is the time across all the days nobody has yet said where it went.
+func Unattended(days []Day) time.Duration {
+	var total time.Duration
+	for _, d := range days {
+		total += d.Unattended()
+	}
+	return total
 }
 
 // Breaks is the lunch break time across all the days.

@@ -16,6 +16,22 @@ and Hardware are the names, in any case, and `!meeting` goes down as External.
 Windows named `lunch` and `afk` record a lunch break and time away, which belong
 to no session. timesheet lists them but leaves them out of every total.
 
+### When the day ends
+
+A watcher runs beside tmux. The day ends when tmux stops, or where the records
+stopped when the machine was turned off or hibernated. A gap shorter than
+`@telemetry-restart` minutes, from restarting the machine or tmux, goes down as
+AFK instead.
+
+### Quiet spells
+
+After `@telemetry-idle` minutes with no key pressed in tmux, a popup asks whether
+anyone is still there. No, or no answer in two minutes, records the time since
+the last key as UNATTENDED. On coming back, a second popup asks where you were:
+`a` for AFK, `l` for lunch, `m` for Meeting, `e` for External, or anything typed,
+which goes to the session in focus. Enter alone leaves it UNATTENDED, to fill in
+later from `timesheet -i`.
+
 `timesheet`, built from this repository, turns the records into a report: the
 time spent on each session and branch, a pie chart of the sessions, a timeline
 of every day, and an interactive view to browse it all.
@@ -52,11 +68,13 @@ build it with `make build`, which needs Go 1.26 or later.
 
 ## Options
 
-| Option              | Default                           | What it does                                                  |
-|---------------------|-----------------------------------|---------------------------------------------------------------|
-| `@telemetry-ignore` | empty                             | sessions never logged, space separated                        |
-| `@telemetry-trunk`  | `main master`                     | branches recorded by folder name, space separated             |
-| `@telemetry-labels` | `Bench Research Meeting Hardware` | window names recorded in place of the branch, space separated |
+| Option               | Default                           | What it does                                                        |
+|----------------------|-----------------------------------|---------------------------------------------------------------------|
+| `@telemetry-ignore`  | empty                             | sessions never logged, space separated                              |
+| `@telemetry-trunk`   | `main master`                     | branches recorded by folder name, space separated                   |
+| `@telemetry-labels`  | `Bench Research Meeting Hardware` | window names recorded in place of the branch, space separated       |
+| `@telemetry-idle`    | `5`                               | minutes without a key pressed before asking whether anyone is there |
+| `@telemetry-restart` | `15`                              | minutes a gap can last and still be a restart, recorded as AFK      |
 
 The records go to `$XDG_STATE_HOME/telemetry`, or to `$TELEMETRY_DIR` when set.
 
@@ -72,12 +90,12 @@ timestamp,event,session,context
 2026-11-10T13:32:08+11:00,focus,Cyberpunk,~/notes
 ```
 
-| Column      | What it holds                                                                                                |
-|-------------|--------------------------------------------------------------------------------------------------------------|
-| `timestamp` | RFC 3339, with the offset                                                                                    |
-| `event`     | `focus` when a pane gains focus or shows a prompt, `away` on detach, `lunch` and `afk` for those windows     |
-| `session`   | the tmux session                                                                                             |
-| `context`   | the window's label; else the git branch; the folder name on the trunk; the folder outside git; empty at home |
+| Column      | What it holds                                                                                                                                    |
+|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
+| `timestamp` | RFC 3339, with the offset                                                                                                                        |
+| `event`     | `focus` when a pane gains focus or shows a prompt, `away` on detach, `lunch` and `afk` for those windows and a restart, `idle` for a quiet spell |
+| `session`   | the tmux session                                                                                                                                 |
+| `context`   | the window's label; else the git branch; the folder name on the trunk; the folder outside git; empty at home                                     |
 
 ## timesheet
 
@@ -140,10 +158,11 @@ status 2, and any other failure with 1. `timesheet completion zsh` (or `bash`,
 * Detaching tmux counts as away until the next record.
 * The totals table keeps each session's rows together, the sessions longest first
   and their work longest first within each.
-* AFK and lunch breaks show in the totals table, the timetables and the timeline,
-  AFK as a faint `z` and lunch as faint dots, but are left out of each session's
-  total, the pie chart and every day's total. JSON and CSV mark them with
-  `counted` false.
+* AFK, lunch breaks and UNATTENDED time show in the totals table, the timetables
+  and the timeline, AFK as a faint `z`, lunch as faint dots and UNATTENDED as
+  faint question marks, but are left out of each session's total, the pie chart
+  and every day's total. Each has its own total in the report's heading, and JSON
+  and CSV mark them with `counted` false.
 
 ### Interactive
 
@@ -168,6 +187,7 @@ periods, so the same work can be followed week to week.
 | `J` `K`            | move through the day's entries                |
 | `enter`, click     | every stretch of the row under the cursor     |
 | `s`                | every stretch of its whole session            |
+| `e`                | say where an UNATTENDED entry went            |
 | `esc`              | back a step, or close the detail              |
 | `r`                | read the records again                        |
 | `?`                | every key                                     |
@@ -183,8 +203,8 @@ make format           # format in place; make format-dry-run lists what needs it
 make release          # cross-compile each release target into dist/
 ```
 
-`tests/record.sh` drives a private tmux server, and needs tmux, zsh, git and
-python3, all of which the dev container has. CI runs the four make targets in
+`tests/record.sh`, `tests/watch.sh` and `tests/idle.sh` drive a private tmux
+server, and need tmux, zsh, git and python3, all of which the dev container has. CI runs the four make targets in
 the dev container on every pull request, and publishes a release on each merge
 to main, with its version worked out from the commit messages.
 

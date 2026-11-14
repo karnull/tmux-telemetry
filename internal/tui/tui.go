@@ -12,6 +12,7 @@ import (
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -82,6 +83,17 @@ type Model struct {
 	// details open, the latest on top, so esc steps back through them
 	details      []sheet.Selection
 	detailScroll int
+
+	// an unattended spell being said where it went, while the box is open
+	fill *fill
+}
+
+// fill is the box asking where an unattended spell went
+type fill struct {
+	spell   string
+	at      time.Time
+	session string
+	input   textinput.Model
 }
 
 // New starts on the configured period.
@@ -193,9 +205,63 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.scrollBy(step), nil
 
 	case tea.KeyPressMsg:
+		if m.fill != nil {
+			return m.handleFill(msg)
+		}
 		return m.handleKey(msg)
 	}
 	return m, nil
+}
+
+// startFill opens the box for the picked entry, when it is an unattended spell.
+// The answer goes to the session worked on just before it.
+func (m Model) startFill() (Model, tea.Cmd) {
+	d, ok := m.selectedDay()
+	if m.view != daysView || !ok || m.entry >= len(d.Entries) || d.Entries[m.entry].Break != sheet.UnattendedBreak {
+		return m, nil
+	}
+	e := d.Entries[m.entry]
+	session := ""
+	for i := m.entry - 1; i >= 0; i-- {
+		if d.Entries[i].Counted() {
+			session = d.Entries[i].Session
+			break
+		}
+	}
+	y, mo, dd := d.Date.Date()
+	input := textinput.New()
+	input.Placeholder = "a for AFK, l lunch, m Meeting, e External, or what it was"
+	input.SetWidth(56)
+	f := &fill{
+		spell:   sheet.Clock(e.Start) + " - " + sheet.Clock(e.End),
+		at:      time.Date(y, mo, dd, 0, 0, 0, 0, time.Local).Add(e.Start + time.Second),
+		session: session,
+		input:   input,
+	}
+	m.fill = f
+	return m, f.input.Focus()
+}
+
+func (m Model) handleFill(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.fill = nil
+		return m, nil
+	case "enter":
+		rec, ok := record.Answer(m.fill.at, m.fill.session, m.fill.input.Value())
+		m.fill = nil
+		if !ok {
+			return m, nil
+		}
+		if err := record.Append(m.cfg.Dir, rec); err != nil {
+			m.err = err
+			return m, nil
+		}
+		return m, m.load()
+	}
+	var cmd tea.Cmd
+	m.fill.input, cmd = m.fill.input.Update(msg)
+	return m, cmd
 }
 
 func (m Model) scrollBy(step int) Model {
@@ -298,6 +364,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if w, ok := m.picked(); ok {
 			return m.openDetail(sheet.Select(w)), nil
 		}
+	case key.Matches(msg, m.keys.Fill):
+		return m.startFill()
 	case key.Matches(msg, m.keys.Session):
 		if w, ok := m.picked(); ok {
 			sel := sheet.Select(w)
@@ -500,6 +568,9 @@ func (m Model) View() tea.View {
 	if len(m.details) > 0 && m.loaded {
 		layers = append(layers, m.detailLayers()...)
 	}
+	if m.fill != nil {
+		layers = append(layers, m.fillLayer())
+	}
 	layers = append(layers, layer(m.helpView(), 0, m.height-lipgloss.Height(m.helpView()), ""))
 
 	comp := lipgloss.NewCompositor(layers...)
@@ -690,6 +761,24 @@ func (m Model) timelineLayers() []*lipgloss.Layer {
 		out = append(out, layer(all[i].text, 0, headerHeight+i-start, all[i].id))
 	}
 	return out
+}
+
+func (m Model) fillLayer() *lipgloss.Layer {
+	where := "it"
+	if m.fill.session != "" {
+		where = m.fill.session
+	}
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.ANSIColor(13)).
+		Padding(1, 2).
+		Render(strings.Join([]string{
+			bold("Where did " + m.fill.spell + " go?"),
+			faint("Work goes to " + where + " · enter to keep it, esc to leave it UNATTENDED"),
+			"",
+			m.fill.input.View(),
+		}, "\n"))
+	return layer(box, max(0, (m.width-lipgloss.Width(box))/2), headerHeight+2, "fillbox").Z(zDetailLines + 1)
 }
 
 func (m Model) detailWidth() int { return clamp(m.width-6, 30, 110) }
