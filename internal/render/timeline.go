@@ -52,7 +52,7 @@ func Axis(t Theme, span Span, width int) string {
 }
 
 // Timeline draws a day as a bar, each cell showing the session that held it longest.
-// AFK shows as a faint z, and a lunch break as faint dots.
+// AFK shows as a faint z, a lunch break as faint dots, and UNATTENDED as faint question marks.
 func Timeline(t Theme, day sheet.Day, span Span, width int) string {
 	return cells(t, day, span, width, func(e sheet.Entry) string { return mark(t, e) })
 }
@@ -74,6 +74,8 @@ func mark(t Theme, e sheet.Entry) string {
 		return t.faint("·")
 	case sheet.AFKBreak:
 		return t.faint("z")
+	case sheet.UnattendedBreak:
+		return t.faint("?")
 	}
 	return t.Paint(e.Session, t.Glyph(e.Session))
 }

@@ -15,7 +15,8 @@ type Options struct {
 	Dir        string
 }
 
-// Summary is the time counted over the days, and the AFK and lunch left out of it.
+// Summary is the time counted over the days, and the AFK, lunch and unattended
+// time left out of it.
 func Summary(days []sheet.Day) string {
 	s := fmt.Sprintf("%s over %d day(s)", sheet.Hours(sheet.Grand(days)), len(days))
 	var left []string
@@ -25,8 +26,15 @@ func Summary(days []sheet.Day) string {
 	if breaks := sheet.Breaks(days); breaks > 0 {
 		left = append(left, sheet.Hours(breaks)+" lunch")
 	}
-	if len(left) > 0 {
-		s += ", not counting " + strings.Join(left, " and ")
+	if unattended := sheet.Unattended(days); unattended > 0 {
+		left = append(left, sheet.Hours(unattended)+" unattended")
+	}
+	switch len(left) {
+	case 0:
+	case 1:
+		s += ", not counting " + left[0]
+	default:
+		s += ", not counting " + strings.Join(left[:len(left)-1], ", ") + " and " + left[len(left)-1]
 	}
 	return s
 }

@@ -29,6 +29,8 @@ func SelectNamed(session, context string) Selection {
 		return Selection{Break: AFKBreak}
 	case "lunch", "lunch break":
 		return Selection{Break: LunchBreak}
+	case "unattended":
+		return Selection{Break: UnattendedBreak}
 	}
 	return Selection{Session: session, Context: context}
 }

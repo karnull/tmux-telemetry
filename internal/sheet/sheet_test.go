@@ -261,3 +261,25 @@ func TestAFKBelongsToNoSession(t *testing.T) {
 		t.Errorf("AFK %s, want 1:30", Hours(Away(days)))
 	}
 }
+
+func TestUnattendedHasItsOwnTotal(t *testing.T) {
+	recs := records("2026-11-12", "09:00 Minecraft x", "10:00 Minecraft x", "10:30 Minecraft x", "11:00 Minecraft x")
+	recs[1] = record.Record{Time: recs[1].Time, Event: record.Idle}
+	days := Build(recs)
+	if got, want := timetable(days[0]), "09:00 - 10:00 Minecraft x\n10:00 - 10:30 UNATTENDED \n10:30 - 11:00 Minecraft x"; got != want {
+		t.Errorf("got\n%s\nwant\n%s", got, want)
+	}
+	if Hours(days[0].Total()) != "1:30" || Hours(Unattended(days)) != "0:30" || days[0].Away() != 0 {
+		t.Errorf("total %s, unattended %s", Hours(days[0].Total()), Hours(Unattended(days)))
+	}
+}
+
+func TestAnAnswerTakesUnattendedsPlace(t *testing.T) {
+	recs := records("2026-11-12", "09:00 Minecraft x", "10:00 Minecraft x", "10:00:01 Minecraft x", "10:30 Minecraft x", "11:00 Minecraft x")
+	recs[1] = record.Record{Time: recs[1].Time, Event: record.Idle}
+	recs[2] = record.Record{Time: recs[2].Time, Event: record.AFK}
+	days := Build(recs)
+	if got, want := timetable(days[0]), "09:00 - 10:00 Minecraft x\n10:00 - 10:30 AFK \n10:30 - 11:00 Minecraft x"; got != want {
+		t.Errorf("AFK a second on should take the whole spell:\ngot\n%s\nwant\n%s", got, want)
+	}
+}
