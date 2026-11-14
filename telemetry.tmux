@@ -12,3 +12,6 @@ for hook in client-session-changed session-window-changed after-select-pane clie
     tmux set-hook -g "$hook[42]" "run-shell -b '$TELEMETRY record #{pane_id}'"
 done
 tmux set-hook -g 'client-detached[42]' "run-shell -b '$TELEMETRY away'"
+
+# the watcher has a session of its own, so it outlives tmux long enough to say when it stopped
+TELEMETRY_SOCKET=$(tmux display-message -p '#{socket_path}') setsid "$TELEMETRY" watch > /dev/null 2>&1 < /dev/null &

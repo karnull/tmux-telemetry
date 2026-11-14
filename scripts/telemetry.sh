@@ -9,6 +9,15 @@ shift
 LOGS="${TELEMETRY_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/telemetry}"
 HEADER="timestamp,event,session,context"
 LABELS="Bench Research Meeting Hardware"
+SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+
+# how often the watcher looks, in seconds; the tests make it shorter
+TICK=${TELEMETRY_TICK:-60}
+
+# the watcher outlives the tmux that started it, so it names the server's socket
+tmux() {
+    command tmux ${TELEMETRY_SOCKET:+-S "$TELEMETRY_SOCKET"} "$@"
+}
 
 
 show_help() {
@@ -19,6 +28,10 @@ Actions:
   record <PANE>   log the session, and the window's label or else the branch or folder;
                   a window named lunch or afk logs a break, with no session
   away            log that tmux was detached
+  watch           keep watch while tmux runs: a gap from a restart goes down as
+                  AFK, and the day ends when tmux or the machine stops
+  resume <FROM> <TO>
+                  log a gap between two moments, as seconds since 1970
 
 Notes:
   - record and away are run by the tmux and shell hooks, not by hand
@@ -51,11 +64,15 @@ write_row() {
     printf '%s,%s,%s,%s\n' "$timestamp" "$event" "$session" "$context" >> "$file"
 }
 
-# %z gives +hhmm, and RFC 3339 wants +hh:mm
+# <seconds since 1970, or -1 for now> as RFC 3339; %z gives +hhmm, and RFC 3339 wants +hh:mm
+stamp() {
+    local s
+    printf -v s '%(%Y-%m-%dT%H:%M:%S%z)T' "$1"
+    echo "${s:0:22}:${s:22}"
+}
+
 now() {
-    local stamp
-    printf -v stamp '%(%Y-%m-%dT%H:%M:%S%z)T' -1
-    echo "${stamp:0:22}:${stamp:22}"
+    stamp -1
 }
 
 append() {
@@ -128,6 +145,52 @@ record_away() {
 
 
 #-------------------------------------------------------------------------------
+# watching
+
+# <from> <to>: nothing ran between the two, as the machine was off or asleep, or
+# tmux wasn't running. A gap shorter than @telemetry-restart minutes is a restart,
+# which goes down as AFK; a longer one ends the day where the records stopped.
+resume() {
+    local from=$1 to=$2 restart
+    [[ -n "$from" ]] && (( to > from )) || return 0
+    restart=$(option restart)
+    if (( to - from < ${restart:-15} * 60 )); then
+        write_row "$(stamp "$from")" afk "" ""
+    else
+        write_row "$(stamp "$from")" away "" ""
+    fi
+}
+
+# One watcher at a time, however often the config is reloaded. Each look leaves
+# the time in .alive, so a look that comes far later than it should, after the
+# machine slept or the watcher was gone with tmux, knows where the gap began.
+watch() {
+    local pidfile="$LOGS/.watcher" alive="$LOGS/.alive" last now
+    mkdir -p "$LOGS"
+    if [[ -s "$pidfile" ]] && kill -0 "$(< "$pidfile")" 2>/dev/null; then
+        return 0
+    fi
+    echo $$ > "$pidfile"
+
+    last=$(cat "$alive" 2>/dev/null)
+    while tmux list-sessions > /dev/null 2>&1; do
+        now=$(date +%s)
+        if [[ -n "$last" ]] && (( now - last > 2 * TICK )); then
+            resume "$last" "$now"
+        fi
+        echo "$now" > "$alive"
+        last=$now
+        sleep "$TICK"
+    done
+
+    # tmux has gone, so the day ends here
+    append away "" ""
+    date +%s > "$alive"
+    rm -f "$pidfile"
+}
+
+
+#-------------------------------------------------------------------------------
 # special commands
 
 case "$ACTION" in
@@ -137,6 +200,14 @@ case "$ACTION" in
 
     away)
         record_away
+        ;;
+
+    watch)
+        watch
+        ;;
+
+    resume)
+        resume "$1" "$2"
         ;;
 
     ""|--help|-h|help)
