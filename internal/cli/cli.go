@@ -63,6 +63,8 @@ type options struct {
 
 	dir string
 
+	session, work string
+
 	format      string
 	color       string
 	timetable   bool
@@ -119,6 +121,10 @@ timesheet 04/2026
 timesheet -cw
 timesheet -pm
 
+# every stretch spent on one branch last week, or on a whole session this month
+timesheet --session Minecraft --work chore/get-started
+timesheet --session Minecraft -cm
+
 # a range of days
 timesheet -s 2026-11-01 -u 2026-11-15
 
@@ -159,6 +165,8 @@ timesheet -pm -f csv > november.csv`,
 	f.StringVar(&opts.color, "colour", "auto", "colour the output: auto, always or never ($NO_COLOR is honoured)")
 	f.StringVar(&opts.color, "color", "auto", "same as --colour")
 	_ = f.MarkHidden("color")
+	f.StringVar(&opts.session, "session", "", "only this session, or afk or lunch, with every stretch spent on it")
+	f.StringVar(&opts.work, "work", "", "only this branch, folder or label, with every stretch spent on it")
 	f.BoolVarP(&opts.timetable, "timetable", "t", false, "add each day's timetable to the text report")
 	f.BoolVarP(&opts.interactive, "interactive", "i", false, "browse the report in the terminal")
 
@@ -311,7 +319,11 @@ func run(cmd *cobra.Command, env Env, opts options) error {
 		if !isTerminal(env.Stdout) || !isTerminal(os.Stdin) {
 			return usagef("--interactive needs a terminal")
 		}
-		return tui.Run(cmd.Context(), tui.Config{Dir: dir, Period: p, Now: env.Now})
+		cfg := tui.Config{Dir: dir, Period: p, Now: env.Now}
+		if sel, ok := opts.selection(); ok {
+			cfg.Detail = &sel
+		}
+		return tui.Run(cmd.Context(), cfg)
 	}
 
 	loaded, err := record.Load(dir, p.First, p.Last)
@@ -322,20 +334,37 @@ func run(cmd *cobra.Command, env Env, opts options) error {
 		fmt.Fprintf(env.Stderr, "timesheet: skipped %d unreadable record(s) in %s\n", loaded.Skipped, dir)
 	}
 	days := sheet.Build(loaded.Records)
+	sel, selected := opts.selection()
 
 	switch strings.ToLower(opts.format) {
-	case "json":
+	case "json", "csv":
+		if selected {
+			days = sheet.Filter(days, sel)
+		}
+		if strings.EqualFold(opts.format, "csv") {
+			return export.CSV(env.Stdout, days)
+		}
 		return export.JSON(env.Stdout, p, days)
-	case "csv":
-		return export.CSV(env.Stdout, days)
 	case "text":
 		theme := render.NewTheme(profile > colorprofile.ASCII, sheet.Sessions(days))
 		out := &colorprofile.Writer{Forward: env.Stdout, Profile: profile}
-		report := render.Report(theme, p, days, render.Options{Width: width(env.Stdout, env), Timetables: opts.timetable, Dir: dir})
+		w := width(env.Stdout, env)
+		report := render.Report(theme, p, days, render.Options{Width: w, Timetables: opts.timetable, Dir: dir})
+		if selected {
+			report = theme.Heading(p.Title()) + "\n\n" + render.DetailText(render.Detail(theme, days, sel, w))
+		}
 		_, err := io.WriteString(out, report)
 		return err
 	}
 	return usagef("--format takes text, json or csv, not %q", opts.format)
+}
+
+// selection is the work --session and --work narrow the report to, if either is set.
+func (o options) selection() (sheet.Selection, bool) {
+	if o.session == "" && o.work == "" {
+		return sheet.Selection{}, false
+	}
+	return sheet.SelectNamed(o.session, o.work), true
 }
 
 // IsUsage says whether an error came from how the command was called.

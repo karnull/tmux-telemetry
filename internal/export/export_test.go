@@ -16,7 +16,7 @@ var days = []sheet.Day{{
 	Entries: []sheet.Entry{
 		{Work: sheet.Work{Session: "Roblox", Context: "release-1.0"}, Start: 9 * time.Hour, End: 12 * time.Hour},
 		{Work: sheet.Work{Session: "Cyberpunk", Context: "notes, drafts"}, Start: 13 * time.Hour, End: 14 * time.Hour},
-		{Work: sheet.Work{Session: "Cyberpunk", Context: "AFK"}, Start: 14 * time.Hour, End: 14*time.Hour + 30*time.Minute},
+		{Work: sheet.Work{Session: sheet.AFKBreak.Name(), Break: sheet.AFKBreak}, Start: 14 * time.Hour, End: 14*time.Hour + 30*time.Minute},
 	},
 }}
 
@@ -28,7 +28,7 @@ func TestCSV(t *testing.T) {
 	want := "date,start,end,session,context,minutes,counted\n" +
 		"2026-11-10,09:00,12:00,Roblox,release-1.0,180,true\n" +
 		"2026-11-10,13:00,14:00,Cyberpunk,\"notes, drafts\",60,true\n" +
-		"2026-11-10,14:00,14:30,Cyberpunk,AFK,30,false\n"
+		"2026-11-10,14:00,14:30,AFK,,30,false\n"
 	if b.String() != want {
 		t.Errorf("got\n%s", b.String())
 	}

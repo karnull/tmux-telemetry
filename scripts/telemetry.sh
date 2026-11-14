@@ -8,7 +8,7 @@ shift
 
 LOGS="${TELEMETRY_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/telemetry}"
 HEADER="timestamp,event,session,context"
-LABELS="Bench AFK Research Meeting Hardware"
+LABELS="Bench Research Meeting Hardware"
 
 
 show_help() {
@@ -17,7 +17,7 @@ Usage: telemetry [action]
 
 Actions:
   record <PANE>   log the session, and the window's label or else the branch or folder;
-                  a window named lunch logs a lunch break
+                  a window named lunch or afk logs a break, with no session
   away            log that tmux was detached
 
 Notes:
@@ -104,11 +104,13 @@ record_pane() {
 
     [[ "$active" == 1 && -n "$session" && " $ignore " != *" $session "* ]] || return 0
 
-    # lunch belongs to no project, so it goes down without the session
-    if [[ "${window,,}" == lunch ]]; then
-        append lunch "" ""
-        return
-    fi
+    # lunch and time away belong to no project, so they go down without the session
+    case "${window,,}" in
+        lunch|afk)
+            append "${window,,}" "" ""
+            return
+            ;;
+    esac
 
     context=$(label "$window" "$labels") || context=$(work "$path" "$trunk")
     append focus "$session" "$context"

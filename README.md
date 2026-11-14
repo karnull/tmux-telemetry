@@ -11,10 +11,10 @@ log nothing. Detaching tmux counts as away.
 
 Rename a window to say what the time is going on, and that goes down in place of
 the branch, whatever the pane shows: in a meeting, rename the window `meeting`
-and carry on doodling, and the record says Meeting. Bench, AFK, Research,
-Meeting and Hardware are the names, in any case, and `!meeting` goes down as
-External. A window named `lunch` records a lunch break, which belongs to no
-session. timesheet lists AFK and lunch but leaves them out of every total.
+and carry on doodling, and the record says Meeting. Bench, Research, Meeting
+and Hardware are the names, in any case, and `!meeting` goes down as External.
+Windows named `lunch` and `afk` record a lunch break and time away, which belong
+to no session. timesheet lists them but leaves them out of every total.
 
 `timesheet`, built from this repository, turns the records into a report: the
 time spent on each session and branch, a pie chart of the sessions, a timeline
@@ -52,11 +52,11 @@ build it with `make build`, which needs Go 1.26 or later.
 
 ## Options
 
-| Option              | Default                               | What it does                                                  |
-|---------------------|---------------------------------------|---------------------------------------------------------------|
-| `@telemetry-ignore` | empty                                 | sessions never logged, space separated                        |
-| `@telemetry-trunk`  | `main master`                         | branches recorded by folder name, space separated             |
-| `@telemetry-labels` | `Bench AFK Research Meeting Hardware` | window names recorded in place of the branch, space separated |
+| Option              | Default                           | What it does                                                  |
+|---------------------|-----------------------------------|---------------------------------------------------------------|
+| `@telemetry-ignore` | empty                             | sessions never logged, space separated                        |
+| `@telemetry-trunk`  | `main master`                     | branches recorded by folder name, space separated             |
+| `@telemetry-labels` | `Bench Research Meeting Hardware` | window names recorded in place of the branch, space separated |
 
 The records go to `$XDG_STATE_HOME/telemetry`, or to `$TELEMETRY_DIR` when set.
 
@@ -75,7 +75,7 @@ timestamp,event,session,context
 | Column      | What it holds                                                                                                |
 |-------------|--------------------------------------------------------------------------------------------------------------|
 | `timestamp` | RFC 3339, with the offset                                                                                    |
-| `event`     | `focus` when a pane gains focus or shows a prompt, `away` on detach, `lunch` for a lunch window              |
+| `event`     | `focus` when a pane gains focus or shows a prompt, `away` on detach, `lunch` and `afk` for those windows     |
 | `session`   | the tmux session                                                                                             |
 | `context`   | the window's label; else the git branch; the folder name on the trunk; the folder outside git; empty at home |
 
@@ -109,15 +109,17 @@ Monday to Sunday, and a weekday name is the latest one, today included. Without
 `--day`, `--week` or `--month`, a bare number could be any of them and is
 refused, and `04/2026` reads as a month.
 
-| Option                | What it does                                                    |
-|-----------------------|-----------------------------------------------------------------|
-| `-s`, `--since`       | first day of a range, in any form `--day` takes                 |
-| `-u`, `--until`       | last day of a range, today unless set                           |
-| `-t`, `--timetable`   | add each day's timetable to the report                          |
-| `-i`, `--interactive` | browse the report in the terminal                               |
-| `-f`, `--format`      | `text`, `json` for the whole report, `csv` for one row an entry |
-| `--colour`            | `auto`, `always` or `never`; `NO_COLOR` is honoured             |
-| `--dir`               | where the records are                                           |
+| Option                | What it does                                                     |
+|-----------------------|------------------------------------------------------------------|
+| `-s`, `--since`       | first day of a range, in any form `--day` takes                  |
+| `-u`, `--until`       | last day of a range, today unless set                            |
+| `--session`           | only this session, or `afk` or `lunch`, with every stretch of it |
+| `--work`              | only this branch, folder or label, with every stretch of it      |
+| `-t`, `--timetable`   | add each day's timetable to the report                           |
+| `-i`, `--interactive` | browse the report in the terminal                                |
+| `-f`, `--format`      | `text`, `json` for the whole report, `csv` for one row an entry  |
+| `--colour`            | `auto`, `always` or `never`; `NO_COLOR` is honoured              |
+| `--dir`               | where the records are                                            |
 
 Without colour, from `NO_COLOR`, a pipe or `--colour never`, sessions stand
 apart by glyph instead.
@@ -146,18 +148,30 @@ status 2, and any other failure with 1. `timesheet completion zsh` (or `bash`,
 ### Interactive
 
 `timesheet -i` opens on the period the options pick, and reads the records again
-every 30 seconds while the period is still going.
+every 30 seconds while the period is still going. With `--session` or `--work`
+it opens straight onto that work's detail.
 
-| Key                | What it does                        |
-|--------------------|-------------------------------------|
-| `tab`, `1` `2` `3` | summary, days, timeline             |
-| `←` `→`, `h` `l`   | the period before or after          |
-| `d` `w` `m`        | switch to a day, a week or a month  |
-| `c`                | back to the current period          |
-| `↑` `↓`, `j` `k`   | move through the totals or the days |
-| `r`                | read the records again              |
-| `?`                | every key                           |
-| `q`                | quit                                |
+Click anything to see every stretch spent on it across the period: a totals row,
+a legend entry for the whole session, a day's entry, or a spot on any timeline.
+The detail lists each day's stretches, such as `12:35 - 17:45`, beside a timeline
+marking them among the rest of the day. A session's detail lists its work, and
+clicking one opens that work's own. The detail stays open moving between
+periods, so the same work can be followed week to week.
+
+| Key                | What it does                                  |
+|--------------------|-----------------------------------------------|
+| `tab`, `1` `2` `3` | summary, days, timeline                       |
+| `←` `→`, `h` `l`   | the period before or after                    |
+| `d` `w` `m`        | switch to a day, a week or a month            |
+| `c`                | back to the current period                    |
+| `↑` `↓`, `j` `k`   | move through the totals or the days           |
+| `J` `K`            | move through the day's entries                |
+| `enter`, click     | every stretch of the row under the cursor     |
+| `s`                | every stretch of its whole session            |
+| `esc`              | back a step, or close the detail              |
+| `r`                | read the records again                        |
+| `?`                | every key                                     |
+| `q`                | quit                                          |
 
 
 ## Development

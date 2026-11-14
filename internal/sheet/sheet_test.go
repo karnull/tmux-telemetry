@@ -122,7 +122,7 @@ func TestAFKIsShownButNotCounted(t *testing.T) {
 
 	if got, want := timetable(days[0]), strings.Join([]string{
 		"09:00 - 10:00 Minecraft chore/get-started",
-		"10:00 - 10:30 Minecraft afk",
+		"10:00 - 10:30 AFK ",
 		"10:30 - 11:00 Minecraft chore/get-started",
 		"11:00 - 12:00 Cyberpunk Meeting",
 	}, "\n"); got != want {
@@ -140,8 +140,8 @@ func TestAFKIsShownButNotCounted(t *testing.T) {
 		}
 	}
 	totals := Totals(days)
-	if afk := totals[1]; afk.Session != "Minecraft" || afk.Counted() || Hours(afk.Duration) != "0:30" {
-		t.Errorf("AFK should follow Minecraft's work, with its time: %+v", afk)
+	if afk := totals[len(totals)-1]; afk.Session != AFK || afk.Counted() || Hours(afk.Duration) != "0:30" {
+		t.Errorf("AFK should come last, on its own, with its time: %+v", afk)
 	}
 	if Hours(Grand(days)) != "2:30" || Hours(Away(days)) != "0:30" {
 		t.Errorf("grand %s, away %s", Hours(Grand(days)), Hours(Away(days)))
@@ -160,7 +160,7 @@ func TestLunchBreakBelongsToNoSession(t *testing.T) {
 		t.Errorf("total %s, lunch %s, AFK %s", Hours(days[0].Total()), Hours(days[0].Breaks()), Hours(days[0].Away()))
 	}
 	for _, s := range Sessions(days) {
-		if s.Session == LunchBreak {
+		if s.Session == LunchBreak.Name() {
 			t.Error("a lunch break should not be a session in the pie")
 		}
 	}
@@ -228,10 +228,36 @@ func TestTotalsKeepEachSessionTogether(t *testing.T) {
 	}
 	want := []string{
 		"Cyberpunk b", "Cyberpunk d",
-		"Minecraft a", "Minecraft c", "Minecraft afk",
-		"Roblox afk",
+		"Minecraft a", "Minecraft c",
+		"AFK ",
 	}
 	if strings.Join(got, ", ") != strings.Join(want, ", ") {
 		t.Errorf("got  %s\nwant %s", strings.Join(got, ", "), strings.Join(want, ", "))
+	}
+}
+
+func TestAFKBelongsToNoSession(t *testing.T) {
+	recs := records("2026-11-12", "09:00 Minecraft x", "10:00 Minecraft x", "11:00 Cyberpunk y")
+	recs[1] = record.Record{Time: recs[1].Time, Event: record.AFK}
+	recs = append(recs, records("2026-11-12", "11:30 Roblox afk", "12:00 Roblox z", "13:00 Roblox z")...)
+	days := Build(recs)
+
+	want := strings.Join([]string{
+		"09:00 - 10:00 Minecraft x",
+		"10:00 - 11:00 AFK ",
+		"11:00 - 11:30 Cyberpunk y",
+		"11:30 - 12:00 AFK ",
+		"12:00 - 13:00 Roblox z",
+	}, "\n")
+	if got := timetable(days[0]); got != want {
+		t.Errorf("an afk record, and AFK recorded as a context, should both be AFK on their own:\ngot\n%s\nwant\n%s", got, want)
+	}
+	for _, s := range Sessions(days) {
+		if s.Session == "Roblox" && Hours(s.Duration) != "1:00" {
+			t.Errorf("Roblox's total %s should leave out the AFK recorded in it", Hours(s.Duration))
+		}
+	}
+	if Hours(Away(days)) != "1:30" {
+		t.Errorf("AFK %s, want 1:30", Hours(Away(days)))
 	}
 }

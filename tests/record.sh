@@ -76,7 +76,7 @@ expected=$(printf '%s\n' \
     'focus,Work,feat/test' \
     'focus,Work,Meeting' \
     'focus,Work,External' \
-    'focus,Work,AFK' \
+    'afk,,' \
     'lunch,,' \
     'focus,Work,feat/test' \
     'focus,Work,repo' \

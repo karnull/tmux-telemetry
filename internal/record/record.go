@@ -13,14 +13,15 @@ import (
 	"time"
 )
 
-// Event is what a record marks: focus moving to a session, tmux detached, or a
-// lunch break.
+// Event is what a record marks: focus moving to a session, tmux detached, a
+// lunch break, or time away from the keyboard.
 type Event int
 
 const (
 	Focus Event = iota
 	Away
 	Lunch
+	AFK
 )
 
 // Record is one row: the focused session and its branch or folder at a moment.
@@ -116,6 +117,9 @@ func parseRow(row []string) (Record, bool) {
 		rec.Session, rec.Context = "", ""
 	case "lunch":
 		rec.Event = Lunch
+		rec.Session, rec.Context = "", ""
+	case "afk":
+		rec.Event = AFK
 		rec.Session, rec.Context = "", ""
 	default:
 		return Record{}, false
