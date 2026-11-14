@@ -32,6 +32,11 @@ Actions:
                   AFK, and the day ends when tmux or the machine stops
   resume <FROM> <TO>
                   log a gap between two moments, as seconds since 1970
+  ask <SINCE> <SESSION> <CLIENT>
+                  in a popup, ask whether anyone is there after a quiet spell,
+                  and once they are back, where they were
+  answer <SINCE> <SESSION> <ANSWER>
+                  log where the time since a quiet spell began went
 
 Notes:
   - record and away are run by the tmux and shell hooks, not by hand
@@ -73,6 +78,11 @@ stamp() {
 
 now() {
     stamp -1
+}
+
+# <seconds since 1970> as HH:MM
+clock() {
+    printf '%(%H:%M)T' "$1"
 }
 
 append() {
@@ -180,6 +190,7 @@ watch() {
         fi
         echo "$now" > "$alive"
         last=$now
+        check_quiet "$now"
         sleep "$TICK"
     done
 
@@ -187,6 +198,95 @@ watch() {
     append away "" ""
     date +%s > "$alive"
     rm -f "$pidfile"
+}
+
+
+#-------------------------------------------------------------------------------
+# quiet spells
+
+# the latest keypress from any client not on an ignored session, then the client and its session
+latest_keypress() {
+    local ignore name session activity best=0 who=""
+    ignore=$(option ignore)
+    while IFS=$'\t' read -r name session activity; do
+        [[ " $ignore " == *" $session "* ]] && continue
+        if (( activity > best )); then
+            best=$activity
+            who="$name"$'\t'"$session"
+        fi
+    done < <(tmux list-clients -F '#{client_name}	#{client_session}	#{client_activity}')
+    [[ -n "$who" ]] && printf '%s\t%s\n' "$best" "$who"
+}
+
+# <now>: after @telemetry-idle minutes without a key pressed, 5 unless set, ask
+# whether anyone is there, once for each quiet spell
+check_quiet() {
+    local now=$1 after activity client session idle
+    idle=$(option idle)
+    after=${TELEMETRY_IDLE_AFTER:-$(( ${idle:-5} * 60 ))}
+    IFS=$'\t' read -r activity client session < <(latest_keypress) || return 0
+    (( now - activity >= after )) || return 0
+    [[ "$(cat "$LOGS/.asked" 2>/dev/null)" == "$activity" ]] && return 0
+    echo "$activity" > "$LOGS/.asked"
+
+    tmux display-popup -c "$client" -E -w 66 -h 11 -T ' telemetry ' -e "TELEMETRY_DIR=$LOGS" \
+        "$(printf '%q ' "$SELF" ask "$activity" "$session" "$client")" &
+}
+
+# <since> <session> <client>: runs in the popup. No answer in two minutes, or no,
+# leaves the time since the last key as UNATTENDED; once someone is back, they
+# can say where they were.
+ask() {
+    local since=$1 session=$2 client=$3 key where
+    printf '\n  Still there? Nothing typed since %s.\n\n' "$(clock "$since")"
+    printf '  [y] yes, carry on        [n] no, stepping away\n\n'
+    printf '  No answer in two minutes counts as away.\n'
+    if read -rsn1 -t 120 key && [[ "${key,,}" != n ]]; then
+        return
+    fi
+    write_row "$(stamp "$since")" idle "" ""
+
+    clear
+    printf '\n  Away since %s, down as UNATTENDED for now.\n\n  Press any key when back.\n' "$(clock "$since")"
+    read -rsn1
+
+    clear
+    printf '\n  Where were you since %s?\n\n' "$(clock "$since")"
+    printf '  [a] AFK   [l] lunch   [m] Meeting   [e] External\n'
+    printf '  or type what it was; Enter alone leaves it UNATTENDED\n\n  > '
+    read -re where
+    answer "$since" "$session" "$where"
+
+    # the break ends now, rather than at the next prompt
+    record_pane "$(tmux display-message -p -c "$client" '#{pane_id}')"
+}
+
+# <since> <session> <answer>: where the time since a quiet spell began went. It is
+# recorded a second after the spell began, so it takes UNATTENDED's place. A label
+# goes to the session in focus when the spell began, or Unnamed without one.
+answer() {
+    local at session=${2:-Unnamed} where=$3 context
+    at=$(stamp $(( $1 + 1 )))
+    case "${where,,}" in
+        "")
+            ;;
+        a|afk)
+            write_row "$at" afk "" ""
+            ;;
+        l|lunch)
+            write_row "$at" lunch "" ""
+            ;;
+        m)
+            write_row "$at" focus "$session" Meeting
+            ;;
+        e)
+            write_row "$at" focus "$session" External
+            ;;
+        *)
+            context=$(label "$where" "$(option labels)") || context=$where
+            write_row "$at" focus "$session" "$context"
+            ;;
+    esac
 }
 
 
@@ -208,6 +308,14 @@ case "$ACTION" in
 
     resume)
         resume "$1" "$2"
+        ;;
+
+    ask)
+        ask "$1" "$2" "$3"
+        ;;
+
+    answer)
+        answer "$1" "$2" "$3"
         ;;
 
     ""|--help|-h|help)
