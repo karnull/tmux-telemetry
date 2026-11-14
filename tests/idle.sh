@@ -59,8 +59,31 @@ printf '%s\n' 'timestamp,event,session,context' '2001-08-31T23:59:00+00:00,focus
 check "carry on from the month before" "$(rows | tail -n 1)" '2001-09-01T00:00:01+00:00,focus,Minecraft,"notes, drafts"'
 rm -rf "$TELEMETRY_DIR"
 
-# a client goes quiet, says it is stepping away, comes back and says it was AFK
+# quiet in a window already named afk or lunch asks nothing, as nobody is there
 export TELEMETRY_TICK=1 TELEMETRY_IDLE_AFTER=3
+for away in afk Lunch; do
+    tmux -f /dev/null new-session -d -s Work -n "$away"
+    tmux run-shell "$ROOT/telemetry.tmux"
+    python3 - <<'PY'
+import os, pty, select, time
+pid, fd = pty.fork()
+if pid == 0:
+    os.execvp("tmux", ["tmux", "attach", "-t", "Work"])
+start = time.time()
+while time.time() < start + 6:
+    if select.select([fd], [], [], 0.2)[0]:
+        try:
+            os.read(fd, 65536)
+        except OSError:
+            break
+PY
+    [ -e "$TELEMETRY_DIR/.asked" ] && { echo "idle: a window named $away should not be asked about"; failed=1; }
+    tmux kill-server
+    sleep 2
+    rm -rf "$TELEMETRY_DIR"
+done
+
+# a client goes quiet, says it is stepping away, comes back and says it was AFK
 tmux -f /dev/null new-session -d -s Work
 tmux run-shell "$ROOT/telemetry.tmux"
 python3 - <<'PY' &
