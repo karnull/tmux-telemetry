@@ -15,6 +15,8 @@ func TestAnswer(t *testing.T) {
 		session string
 		context string
 	}{
+		{"c", Focus, "Minecraft", "main"},
+		{"Continue", Focus, "Minecraft", "main"},
 		{"a", AFK, "", ""},
 		{"AFK", AFK, "", ""},
 		{"lunch", Lunch, "", ""},
@@ -25,15 +27,18 @@ func TestAnswer(t *testing.T) {
 		{"fixing the printer", Focus, "Minecraft", "fixing the printer"},
 	}
 	for _, tt := range tests {
-		got, ok := Answer(at, "Minecraft", tt.where)
+		got, ok := Answer(at, "Minecraft", "main", tt.where)
 		if !ok || got.Event != tt.event || got.Session != tt.session || got.Context != tt.context {
 			t.Errorf("%q: got %+v", tt.where, got)
 		}
 	}
-	if _, ok := Answer(at, "Minecraft", "  "); ok {
+	if _, ok := Answer(at, "Minecraft", "main", "  "); ok {
 		t.Error("an empty answer should leave the spell as it was")
 	}
-	if got, _ := Answer(at, "", "m"); got.Session != "Unnamed" {
+	if _, ok := Answer(at, "", "", "c"); ok {
+		t.Error("carrying on with nothing before should leave the spell as it was")
+	}
+	if got, _ := Answer(at, "", "", "m"); got.Session != "Unnamed" {
 		t.Errorf("no session should go down as Unnamed, got %q", got.Session)
 	}
 }

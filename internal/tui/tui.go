@@ -90,10 +90,10 @@ type Model struct {
 
 // fill is the box asking where an unattended spell went
 type fill struct {
-	spell   string
-	at      time.Time
-	session string
-	input   textinput.Model
+	spell  string
+	at     time.Time
+	before sheet.Work
+	input  textinput.Model
 }
 
 // New starts on the configured period.
@@ -221,22 +221,22 @@ func (m Model) startFill() (Model, tea.Cmd) {
 		return m, nil
 	}
 	e := d.Entries[m.entry]
-	session := ""
+	var before sheet.Work
 	for i := m.entry - 1; i >= 0; i-- {
 		if d.Entries[i].Counted() {
-			session = d.Entries[i].Session
+			before = d.Entries[i].Work
 			break
 		}
 	}
 	y, mo, dd := d.Date.Date()
 	input := textinput.New()
-	input.Placeholder = "a for AFK, l lunch, m Meeting, e External, or what it was"
+	input.Placeholder = "c to carry on, a AFK, l lunch, m Meeting, e External, or what it was"
 	input.SetWidth(56)
 	f := &fill{
-		spell:   sheet.Clock(e.Start) + " - " + sheet.Clock(e.End),
-		at:      time.Date(y, mo, dd, 0, 0, 0, 0, time.Local).Add(e.Start + time.Second),
-		session: session,
-		input:   input,
+		spell:  sheet.Clock(e.Start) + " - " + sheet.Clock(e.End),
+		at:     time.Date(y, mo, dd, 0, 0, 0, 0, time.Local).Add(e.Start + time.Second),
+		before: before,
+		input:  input,
 	}
 	m.fill = f
 	return m, f.input.Focus()
@@ -248,7 +248,7 @@ func (m Model) handleFill(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.fill = nil
 		return m, nil
 	case "enter":
-		rec, ok := record.Answer(m.fill.at, m.fill.session, m.fill.input.Value())
+		rec, ok := record.Answer(m.fill.at, m.fill.before.Session, m.fill.before.Context, m.fill.input.Value())
 		m.fill = nil
 		if !ok {
 			return m, nil
@@ -764,9 +764,10 @@ func (m Model) timelineLayers() []*lipgloss.Layer {
 }
 
 func (m Model) fillLayer() *lipgloss.Layer {
-	where := "it"
-	if m.fill.session != "" {
-		where = m.fill.session
+	where, carry := "it", ""
+	if m.fill.before.Session != "" {
+		where = m.fill.before.Session
+		carry = ", c carries on with " + sheet.Select(m.fill.before).Title()
 	}
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -774,7 +775,8 @@ func (m Model) fillLayer() *lipgloss.Layer {
 		Padding(1, 2).
 		Render(strings.Join([]string{
 			bold("Where did " + m.fill.spell + " go?"),
-			faint("Work goes to " + where + " · enter to keep it, esc to leave it UNATTENDED"),
+			faint("Work goes to " + where + carry),
+			faint("enter to keep it, esc to leave it UNATTENDED"),
 			"",
 			m.fill.input.View(),
 		}, "\n"))
