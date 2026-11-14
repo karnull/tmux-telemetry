@@ -226,7 +226,9 @@ func TestUnattendedCanBeFilledInLater(t *testing.T) {
 		stamp(9, 0) + ",focus,Minecraft,main\n" +
 		stamp(10, 0) + ",idle,,\n" +
 		stamp(10, 30) + ",focus,Minecraft,main\n" +
-		stamp(11, 0) + ",focus,Minecraft,main\n"
+		stamp(11, 0) + ",idle,,\n" +
+		stamp(11, 30) + ",focus,Minecraft,main\n" +
+		stamp(12, 0) + ",focus,Minecraft,main\n"
 	if err := os.WriteFile(filepath.Join(dir, "2026-11.csv"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -245,6 +247,13 @@ func TestUnattendedCanBeFilledInLater(t *testing.T) {
 	d, _ := m.selectedDay()
 	if got := d.Entries[1]; got.Session != "Minecraft" || got.Context != "Meeting" || got.Start != 10*time.Hour {
 		t.Errorf("the spell should now be Minecraft's Meeting from 10:00, got %+v", got)
+	}
+
+	// carrying on gives the next spell to the work just before it
+	m = press(m, "J", "J", "e", "c", "enter")
+	d, _ = m.selectedDay()
+	if got := d.Entries[len(d.Entries)-1]; len(d.Entries) != 3 || got.Context != "main" || got.Start != 10*time.Hour+30*time.Minute {
+		t.Errorf("carrying on should leave one stretch of main from 10:30, got %+v", d.Entries)
 	}
 
 	// an entry that isn't unattended has nothing to fill in

@@ -60,13 +60,17 @@ csv_field() {
 # <timestamp> <event> <session> <context>, the timestamp in RFC 3339
 write_row() {
     local timestamp=$1 event=$2 session=$3 context=$4
-    local file="$LOGS/${timestamp:0:7}.csv"
-
     csv_field session
     csv_field context
+    write_raw "$timestamp" "$event" "$session,$context"
+}
+
+# <timestamp> <event> <session and context, quoted as the records hold them>
+write_raw() {
+    local file="$LOGS/${1:0:7}.csv"
     mkdir -p "$LOGS"
     [ -s "$file" ] || echo "$HEADER" >> "$file"
-    printf '%s,%s,%s,%s\n' "$timestamp" "$event" "$session" "$context" >> "$file"
+    printf '%s,%s,%s\n' "$1" "$2" "$3" >> "$file"
 }
 
 # <seconds since 1970, or -1 for now> as RFC 3339; %z gives +hhmm, and RFC 3339 wants +hh:mm
@@ -204,27 +208,34 @@ watch() {
 #-------------------------------------------------------------------------------
 # quiet spells
 
-# the latest keypress from any client not on an ignored session, then the client and its session
+# the latest keypress from any client not on an ignored session, then the client,
+# its session and the window it has in focus
 latest_keypress() {
-    local ignore name session activity best=0 who=""
+    local ignore name session activity window best=0 who=""
     ignore=$(option ignore)
-    while IFS=$'\t' read -r name session activity; do
+    while IFS=$'\t' read -r name session activity window; do
         [[ " $ignore " == *" $session "* ]] && continue
         if (( activity > best )); then
             best=$activity
-            who="$name"$'\t'"$session"
+            who="$name"$'\t'"$session"$'\t'"$window"
         fi
-    done < <(tmux list-clients -F '#{client_name}	#{client_session}	#{client_activity}')
+    done < <(tmux list-clients -F '#{client_name}	#{client_session}	#{client_activity}	#{window_name}')
     [[ -n "$who" ]] && printf '%s\t%s\n' "$best" "$who"
 }
 
 # <now>: after @telemetry-idle minutes without a key pressed, 5 unless set, ask
-# whether anyone is there, once for each quiet spell
+# whether anyone is there, once for each quiet spell. A window named afk or lunch
+# already says nobody is, so there is nothing to ask.
 check_quiet() {
-    local now=$1 after activity client session idle
+    local now=$1 after activity client session window idle
     idle=$(option idle)
     after=${TELEMETRY_IDLE_AFTER:-$(( ${idle:-5} * 60 ))}
-    IFS=$'\t' read -r activity client session < <(latest_keypress) || return 0
+    IFS=$'\t' read -r activity client session window < <(latest_keypress) || return 0
+    case "${window,,}" in
+        afk|lunch)
+            return 0
+            ;;
+    esac
     (( now - activity >= after )) || return 0
     [[ "$(cat "$LOGS/.asked" 2>/dev/null)" == "$activity" ]] && return 0
     echo "$activity" > "$LOGS/.asked"
@@ -252,6 +263,7 @@ ask() {
 
     clear
     printf '\n  Where were you since %s?\n\n' "$(clock "$since")"
+    printf '  [c] carry on with what you were doing\n'
     printf '  [a] AFK   [l] lunch   [m] Meeting   [e] External\n'
     printf '  or type what it was; Enter alone leaves it UNATTENDED\n\n  > '
     read -re where
@@ -259,6 +271,26 @@ ask() {
 
     # the break ends now, rather than at the next prompt
     record_pane "$(tmux display-message -p -c "$client" '#{pane_id}')"
+}
+
+# <since>: the session and work last in focus before a moment, as the records
+# hold them, so they can be written again as they are. A spell can begin just
+# after a month does, so the month before is looked through too.
+last_focus() {
+    local before month file line best="" found=""
+    before=$(stamp "$1")
+    for month in "$(date -d "$(printf '%(%Y-%m-01)T' "$1") -1 day" +%Y-%m)" "$(printf '%(%Y-%m)T' "$1")"; do
+        file="$LOGS/$month.csv"
+        [[ -r "$file" ]] || continue
+        # an answer is written long after the spell it fills, so the file isn't in time order
+        while IFS= read -r line; do
+            [[ "${line:25:7}" == ",focus," ]] || continue
+            [[ "${line:0:25}" > "$before" || "${line:0:25}" < "$best" ]] && continue
+            best=${line:0:25}
+            found=${line:32}
+        done < "$file"
+    done
+    [[ -n "$found" ]] && echo "$found"
 }
 
 # <since> <session> <answer>: where the time since a quiet spell began went. It is
@@ -269,6 +301,12 @@ answer() {
     at=$(stamp $(( $1 + 1 )))
     case "${where,,}" in
         "")
+            ;;
+        c|continue)
+            # carrying on with what was in focus, or left UNATTENDED when nothing was
+            if context=$(last_focus "$1"); then
+                write_raw "$at" focus "$context"
+            fi
             ;;
         a|afk)
             write_row "$at" afk "" ""

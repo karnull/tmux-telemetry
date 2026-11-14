@@ -26,11 +26,12 @@ AFK instead.
 ### Quiet spells
 
 After `@telemetry-idle` minutes with no key pressed in tmux, a popup asks whether
-anyone is still there. No, or no answer in two minutes, records the time since
+anyone is still there, unless the window in focus is named `afk` or `lunch`. No, or no answer in two minutes, records the time since
 the last key as UNATTENDED. On coming back, a second popup asks where you were:
-`a` for AFK, `l` for lunch, `m` for Meeting, `e` for External, or anything typed,
+`c` to carry on with whatever was in focus before, as one stretch with it, `a`
+for AFK, `l` for lunch, `m` for Meeting, `e` for External, or anything typed,
 which goes to the session in focus. Enter alone leaves it UNATTENDED, to fill in
-later from `timesheet -i`.
+later from `timesheet -i`, which takes the same answers.
 
 `timesheet`, built from this repository, turns the records into a report: the
 time spent on each session and branch, a pie chart of the sessions, a timeline

@@ -41,8 +41,49 @@ check "answers" "$(rows)" "$(printf '%s\n' \
     '2001-09-09T01:46:41+00:00,focus,Unnamed,Meeting')"
 rm -rf "$TELEMETRY_DIR"
 
-# a client goes quiet, says it is stepping away, comes back and says it was AFK
+# carrying on gives the spell to what was last in focus before it, and nothing
+# when nothing was
+"$ROOT/scripts/telemetry.sh" answer 1000000000 Minecraft c
+check "nothing to carry on" "$(rows 2>/dev/null)" ""
+mkdir -p "$TELEMETRY_DIR"
+printf '%s\n' 'timestamp,event,session,context' \
+    '2001-09-09T01:40:00+00:00,focus,Minecraft,"notes, drafts"' \
+    '2001-09-09T01:45:00+00:00,focus,Cyberpunk,feat/chrome' \
+    '2001-09-09T01:46:40+00:00,idle,,' \
+    '2001-09-09T01:50:00+00:00,focus,Roblox,main' \
+    '2001-09-09T01:20:00+00:00,focus,Roblox,filled in late' > "$TELEMETRY_DIR/2001-09.csv"
+"$ROOT/scripts/telemetry.sh" answer 1000000000 Minecraft continue
+check "carry on" "$(rows | tail -n 1)" '2001-09-09T01:46:41+00:00,focus,Cyberpunk,feat/chrome'
+printf '%s\n' 'timestamp,event,session,context' '2001-08-31T23:59:00+00:00,focus,Minecraft,"notes, drafts"' > "$TELEMETRY_DIR/2001-08.csv"
+"$ROOT/scripts/telemetry.sh" answer 999302400 Roblox c
+check "carry on from the month before" "$(rows | tail -n 1)" '2001-09-01T00:00:01+00:00,focus,Minecraft,"notes, drafts"'
+rm -rf "$TELEMETRY_DIR"
+
+# quiet in a window already named afk or lunch asks nothing, as nobody is there
 export TELEMETRY_TICK=1 TELEMETRY_IDLE_AFTER=3
+for away in afk Lunch; do
+    tmux -f /dev/null new-session -d -s Work -n "$away"
+    tmux run-shell "$ROOT/telemetry.tmux"
+    python3 - <<'PY'
+import os, pty, select, time
+pid, fd = pty.fork()
+if pid == 0:
+    os.execvp("tmux", ["tmux", "attach", "-t", "Work"])
+start = time.time()
+while time.time() < start + 6:
+    if select.select([fd], [], [], 0.2)[0]:
+        try:
+            os.read(fd, 65536)
+        except OSError:
+            break
+PY
+    [ -e "$TELEMETRY_DIR/.asked" ] && { echo "idle: a window named $away should not be asked about"; failed=1; }
+    tmux kill-server
+    sleep 2
+    rm -rf "$TELEMETRY_DIR"
+done
+
+# a client goes quiet, says it is stepping away, comes back and says it was AFK
 tmux -f /dev/null new-session -d -s Work
 tmux run-shell "$ROOT/telemetry.tmux"
 python3 - <<'PY' &
