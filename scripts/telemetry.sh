@@ -208,27 +208,34 @@ watch() {
 #-------------------------------------------------------------------------------
 # quiet spells
 
-# the latest keypress from any client not on an ignored session, then the client and its session
+# the latest keypress from any client not on an ignored session, then the client,
+# its session and the window it has in focus
 latest_keypress() {
-    local ignore name session activity best=0 who=""
+    local ignore name session activity window best=0 who=""
     ignore=$(option ignore)
-    while IFS=$'\t' read -r name session activity; do
+    while IFS=$'\t' read -r name session activity window; do
         [[ " $ignore " == *" $session "* ]] && continue
         if (( activity > best )); then
             best=$activity
-            who="$name"$'\t'"$session"
+            who="$name"$'\t'"$session"$'\t'"$window"
         fi
-    done < <(tmux list-clients -F '#{client_name}	#{client_session}	#{client_activity}')
+    done < <(tmux list-clients -F '#{client_name}	#{client_session}	#{client_activity}	#{window_name}')
     [[ -n "$who" ]] && printf '%s\t%s\n' "$best" "$who"
 }
 
 # <now>: after @telemetry-idle minutes without a key pressed, 5 unless set, ask
-# whether anyone is there, once for each quiet spell
+# whether anyone is there, once for each quiet spell. A window named afk or lunch
+# already says nobody is, so there is nothing to ask.
 check_quiet() {
-    local now=$1 after activity client session idle
+    local now=$1 after activity client session window idle
     idle=$(option idle)
     after=${TELEMETRY_IDLE_AFTER:-$(( ${idle:-5} * 60 ))}
-    IFS=$'\t' read -r activity client session < <(latest_keypress) || return 0
+    IFS=$'\t' read -r activity client session window < <(latest_keypress) || return 0
+    case "${window,,}" in
+        afk|lunch)
+            return 0
+            ;;
+    esac
     (( now - activity >= after )) || return 0
     [[ "$(cat "$LOGS/.asked" 2>/dev/null)" == "$activity" ]] && return 0
     echo "$activity" > "$LOGS/.asked"

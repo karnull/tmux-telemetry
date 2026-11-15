@@ -26,7 +26,7 @@ AFK instead.
 ### Quiet spells
 
 After `@telemetry-idle` minutes with no key pressed in tmux, a popup asks whether
-anyone is still there. No, or no answer in two minutes, records the time since
+anyone is still there, unless the window in focus is named `afk` or `lunch`. No, or no answer in two minutes, records the time since
 the last key as UNATTENDED. On coming back, a second popup asks where you were:
 `c` to carry on with whatever was in focus before, as one stretch with it, `a`
 for AFK, `l` for lunch, `m` for Meeting, `e` for External, or anything typed,
