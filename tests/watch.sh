@@ -46,10 +46,13 @@ check "a restart is AFK" "$(events | grep afk)" "$(TZ=UTC printf '%(%Y-%m-%dT%H:
 [ -s "$TELEMETRY_DIR/.watcher" ] || { echo "watch: no watcher running"; failed=1; }
 watcher=$(< "$TELEMETRY_DIR/.watcher")
 
-# a second start, as from reloading the config, leaves the one watcher
+# a second start, as from reloading an updated plugin, takes over from the first
 tmux run-shell "$ROOT/telemetry.tmux"
 sleep 1
-check "one watcher" "$(< "$TELEMETRY_DIR/.watcher")" "$watcher"
+[ "$(< "$TELEMETRY_DIR/.watcher")" != "$watcher" ] || { echo "watch: a reload should start a new watcher"; failed=1; }
+kill -0 "$watcher" 2>/dev/null && { echo "watch: the old watcher is still running"; failed=1; }
+check "no gap from taking over" "$(events | grep -c afk)" "1"
+watcher=$(< "$TELEMETRY_DIR/.watcher")
 
 # a watcher stopped for a while, as the machine is when it sleeps, notices on waking
 kill -STOP "$watcher"
