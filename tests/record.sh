@@ -54,6 +54,7 @@ attach popup; sleep 2
 step send -t popup 'true' Enter
 step detach-client -s popup
 step switch-client -t Work
+# a window named for a meeting is only a name now; the meeting keys say when one is on
 step rename-window -t Work: MEETING
 step rename-window -t Work: '!Meeting'
 step rename-window -t Work: afk
@@ -84,8 +85,6 @@ expected=$(printf '%s\n' \
     'focus,Other,Widget' \
     'focus,Other,' \
     'focus,Work,feat/test' \
-    'focus,Work,Meeting' \
-    'focus,Work,External' \
     'afk,,' \
     'lunch,,' \
     'focus,Work,feat/test' \

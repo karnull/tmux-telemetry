@@ -8,7 +8,7 @@ shift
 
 LOGS="${TELEMETRY_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/telemetry}"
 HEADER="timestamp,event,session,context"
-LABELS="Bench Research Meeting Hardware"
+LABELS="Bench Research Hardware"
 SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
 # how often the watcher looks, in seconds; the tests make it shorter
@@ -96,13 +96,9 @@ append() {
 }
 
 # a window named for an activity, in any case, is what the time went on, whatever
-# the pane shows; !meeting is an internal meeting, which goes down as External
+# the pane shows
 label() {
     local window=${1,,} label
-    if [[ "$window" == "!meeting" ]]; then
-        echo External
-        return
-    fi
     for label in ${2:-$LABELS}; do
         if [[ "$window" == "${label,,}" ]]; then
             echo "$label"

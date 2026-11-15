@@ -9,7 +9,7 @@ import (
 )
 
 // labels are the window names the plugin records by name, as it spells them
-var labels = []string{"Bench", "Research", "Meeting", "Hardware"}
+var labels = []string{"Bench", "Research", "Hardware"}
 
 // Answer reads where a quiet spell went, the way the plugin's popup does: c to
 // carry on with the work given, a for AFK, e for External, p (or m) for Meeting,
