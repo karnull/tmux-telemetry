@@ -37,6 +37,8 @@ Actions:
                   and once they are back, where they were
   answer <SINCE> <SESSION> <ANSWER>
                   log where the time since a quiet spell began went
+  meeting <PANE>  start or end a project meeting in the pane's session
+  external <PANE> start or end an external meeting, which marks every session
 
 Notes:
   - record and away are run by the tmux and shell hooks, not by hand
@@ -125,15 +127,23 @@ work() {
     fi
 }
 
+# <variable> <session>: the session's name without a meeting's marks
+unmark() {
+    local _unmarked=$2
+    [[ "$_unmarked" == "<"?*">" || "$_unmarked" == "["?*"]" ]] && _unmarked=${_unmarked:1:-1}
+    printf -v "$1" '%s' "$_unmarked"
+}
+
 # only the pane in focus counts, so background panes finishing a command don't
 record_pane() {
-    local active session path ignore trunk window labels context
+    local active session name path ignore trunk window labels context
     # read folds runs of tabs together, so fields that may be empty carry a leading =
     IFS=$'\t' read -r active session path ignore trunk labels window < <(tmux display-message -p -t "$1" \
         '#{&&:#{session_attached},#{&&:#{window_active},#{pane_active}}}	#{session_name}	#{pane_current_path}	=#{@telemetry-ignore}	=#{@telemetry-trunk}	=#{@telemetry-labels}	=#{window_name}')
     ignore=${ignore#=} trunk=${trunk#=} labels=${labels#=} window=${window#=}
+    unmark name "$session"
 
-    [[ "$active" == 1 && -n "$session" && " $ignore " != *" $session "* ]] || return 0
+    [[ "$active" == 1 && -n "$name" && " $ignore " != *" $name "* ]] || return 0
 
     # lunch and time away belong to no project, so they go down without the session
     case "${window,,}" in
@@ -143,8 +153,20 @@ record_pane() {
             ;;
     esac
 
+    # an external meeting belongs to no project, so it goes down as a session of its own
+    case "$session" in
+        "["?*"]")
+            append focus External Meeting
+            return
+            ;;
+        "<"?*">")
+            append focus "$name" Meeting
+            return
+            ;;
+    esac
+
     context=$(label "$window" "$labels") || context=$(work "$path" "$trunk")
-    append focus "$session" "$context"
+    append focus "$name" "$context"
 }
 
 # a popup on an ignored session is a client of its own, so closing it leaves another attached
@@ -152,9 +174,57 @@ record_away() {
     local ignore session
     ignore=$(option ignore)
     while read -r session; do
+        unmark session "$session"
         [[ " $ignore " == *" $session "* ]] || return 0
     done < <(tmux list-clients -F '#{client_session}')
     append away "" ""
+}
+
+
+#-------------------------------------------------------------------------------
+# meetings
+
+# A session in a meeting wears it in its name, <name> for a project meeting and
+# [name] for an external one, so the status line shows it and recording reads it.
+
+# <mark>: every session renamed into an external meeting, given [], or out of any meeting
+mark_sessions() {
+    local id name bare
+    while IFS=$'\t' read -r id name; do
+        unmark bare "$name"
+        [[ -n "$1" ]] && bare="[$bare]"
+        [[ "$bare" == "$name" ]] || tmux rename-session -t "$id" "$bare"
+    done < <(tmux list-sessions -F '#{session_id}	#{session_name}')
+}
+
+external_meeting() {
+    tmux list-sessions -F '#{session_name}' | grep -q '^\[.*\]$'
+}
+
+# <pane>: a project meeting starts or ends in the pane's session; one starting
+# ends any other meeting, external or not
+toggle_meeting() {
+    local id name
+    IFS=$'\t' read -r id name < <(tmux display-message -p -t "$1" '#{session_id}	#{session_name}')
+    [[ -n "$id" ]] || return 0
+    if [[ "$name" == "<"?*">" ]]; then
+        tmux rename-session -t "$id" "${name:1:-1}"
+    else
+        mark_sessions ""
+        unmark name "$name"
+        tmux rename-session -t "$id" "<$name>"
+    fi
+    record_pane "$1"
+}
+
+# <pane>: an external meeting starts or ends for every session, ending any project meeting
+toggle_external() {
+    if external_meeting; then
+        mark_sessions ""
+    else
+        mark_sessions "[]"
+    fi
+    record_pane "$1"
 }
 
 
@@ -223,10 +293,11 @@ watch() {
 # the latest keypress from any client not on an ignored session, then the client,
 # its session and the window it has in focus
 latest_keypress() {
-    local ignore name session activity window best=0 who=""
+    local ignore name session bare activity window best=0 who=""
     ignore=$(option ignore)
     while IFS=$'\t' read -r name session activity window; do
-        [[ " $ignore " == *" $session "* ]] && continue
+        unmark bare "$session"
+        [[ " $ignore " == *" $bare "* ]] && continue
         if (( activity > best )); then
             best=$activity
             who="$name"$'\t'"$session"$'\t'"$window"
@@ -237,7 +308,8 @@ latest_keypress() {
 
 # <now>: after @telemetry-idle minutes without a key pressed, 5 unless set, ask
 # whether anyone is there, once for each quiet spell. A window named afk or lunch
-# already says nobody is, so there is nothing to ask.
+# already says nobody is, and a meeting says where the time is going, so there is
+# nothing to ask.
 check_quiet() {
     local now=$1 after activity client session window idle
     idle=$(option idle)
@@ -248,6 +320,7 @@ check_quiet() {
             return 0
             ;;
     esac
+    [[ "$session" == "<"?*">" || "$session" == "["?*"]" ]] && return 0
     (( now - activity >= after )) || return 0
     [[ "$(cat "$LOGS/.asked" 2>/dev/null)" == "$activity" ]] && return 0
     echo "$activity" > "$LOGS/.asked"
@@ -368,6 +441,14 @@ case "$ACTION" in
 
     answer)
         answer "$1" "$2" "$3"
+        ;;
+
+    meeting)
+        toggle_meeting "$1"
+        ;;
+
+    external)
+        toggle_external "$1"
         ;;
 
     ""|--help|-h|help)
