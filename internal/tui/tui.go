@@ -230,7 +230,7 @@ func (m Model) startFill() (Model, tea.Cmd) {
 	}
 	y, mo, dd := d.Date.Date()
 	input := textinput.New()
-	input.Placeholder = "a AFK, e External, p Meeting, c to carry on, or what it was"
+	input.Placeholder = "a AFK, e external meeting, p project meeting, c carry on"
 	input.SetWidth(56)
 	f := &fill{
 		spell:  sheet.Clock(e.Start) + " - " + sheet.Clock(e.End),

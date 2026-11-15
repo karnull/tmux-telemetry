@@ -397,11 +397,12 @@ answer() {
         l|lunch)
             write_row "$at" lunch "" ""
             ;;
-        p|m)
+        p|m|meeting)
             write_row "$at" focus "$session" Meeting
             ;;
-        e)
-            write_row "$at" focus "$session" External
+        e|external|!meeting)
+            # an external meeting belongs to no project, as with prefix M
+            write_row "$at" focus External Meeting
             ;;
         *)
             context=$(label "$where" "$(option labels)") || context=$where

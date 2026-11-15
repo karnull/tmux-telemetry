@@ -36,7 +36,7 @@ check "answers" "$(rows)" "$(printf '%s\n' \
     '2001-09-09T01:46:41+00:00,lunch,,' \
     '2001-09-09T01:46:41+00:00,focus,Minecraft,Meeting' \
     '2001-09-09T01:46:41+00:00,focus,Minecraft,Meeting' \
-    '2001-09-09T01:46:41+00:00,focus,Minecraft,External' \
+    '2001-09-09T01:46:41+00:00,focus,External,Meeting' \
     '2001-09-09T01:46:41+00:00,focus,Minecraft,Bench' \
     '2001-09-09T01:46:41+00:00,focus,Minecraft,fixing the printer' \
     '2001-09-09T01:46:41+00:00,focus,Unnamed,Meeting')"
