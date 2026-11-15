@@ -20,6 +20,7 @@ func TestAnswer(t *testing.T) {
 		{"a", AFK, "", ""},
 		{"AFK", AFK, "", ""},
 		{"lunch", Lunch, "", ""},
+		{"p", Focus, "Minecraft", "Meeting"},
 		{"m", Focus, "Minecraft", "Meeting"},
 		{"e", Focus, "Minecraft", "External"},
 		{"!Meeting", Focus, "Minecraft", "External"},

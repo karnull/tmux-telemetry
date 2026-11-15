@@ -274,10 +274,12 @@ ask() {
     read -rsn1
 
     clear
-    printf '\n  Where were you since %s?\n\n' "$(clock "$since")"
-    printf '  [c] carry on with what you were doing\n'
-    printf '  [a] AFK   [l] lunch   [m] Meeting   [e] External\n'
-    printf '  or type what it was; Enter alone leaves it UNATTENDED\n\n  > '
+    # l, m, a label or anything typed still work, as before, without crowding the list
+    printf '\n  Unattended since %s. Log activity:\n\n' "$(clock "$since")"
+    printf '  [a] AFK\n'
+    printf '  [e] External Meeting\n'
+    printf '  [p] Project Meeting\n'
+    printf '  [c] Continue Previous\n\n  > '
     read -re where
     answer "$since" "$session" "$where"
 
@@ -326,7 +328,7 @@ answer() {
         l|lunch)
             write_row "$at" lunch "" ""
             ;;
-        m)
+        p|m)
             write_row "$at" focus "$session" Meeting
             ;;
         e)
