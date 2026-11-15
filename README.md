@@ -10,11 +10,21 @@ Panes in the background, sessions with no client attached and ignored sessions
 log nothing. Detaching tmux counts as away.
 
 Rename a window to say what the time is going on, and that goes down in place of
-the branch, whatever the pane shows: in a meeting, rename the window `meeting`
-and carry on doodling, and the record says Meeting. Bench, Research, Meeting
-and Hardware are the names, in any case, and `!meeting` goes down as External.
-Windows named `lunch` and `afk` record a lunch break and time away, which belong
-to no session. timesheet lists them but leaves them out of every total.
+the branch, whatever the pane shows. Bench, Research and Hardware are the names,
+in any case. Windows named `lunch` and `afk` record a lunch break and time away,
+which belong to no session. timesheet lists them but leaves them out of every
+total.
+
+### Meetings
+
+Prefix `m` starts a meeting about the project in focus: its session shows as
+`<Minecraft>`, and the time goes down as Meeting for that session, whatever the
+pane shows, so you can carry on doodling. Prefix `M` starts an external meeting,
+which belongs to no project: every session shows as `[Minecraft]`, and the time
+goes down as Meeting under a session of its own, External. The same key again
+ends the meeting, and starting one ends any other. `@telemetry-meeting-key` and
+`@telemetry-external-key` choose other keys, for anyone who would rather keep
+tmux's own prefix `m` and `M` for marking panes.
 
 ### When the day ends
 
@@ -28,10 +38,11 @@ AFK instead.
 ### Quiet spells
 
 After `@telemetry-idle` minutes with no key pressed in tmux, a popup asks whether
-anyone is still there, unless the window in focus is named `afk` or `lunch`. No, or no answer in two minutes, records the time since
+anyone is still there, unless the window in focus is named `afk` or `lunch` or a
+meeting is on. No, or no answer in two minutes, records the time since
 the last key as UNATTENDED. On coming back, a second popup asks where you were:
-`a` for AFK, `e` for an external meeting, `p` for a project meeting, recorded as
-Meeting, or `c` to carry on with whatever was in focus before, as one stretch
+`a` for AFK, `e` for an external meeting, recorded under External, `p` for a
+meeting about the session in focus, recorded as Meeting, or `c` to carry on with whatever was in focus before, as one stretch
 with it. It also takes `l` for lunch, `m` for Meeting, or anything typed, which
 goes to the session in focus. Enter alone leaves it UNATTENDED, to fill in
 later from `timesheet -i`, which takes the same answers.
@@ -72,13 +83,15 @@ build it with `make build`, which needs Go 1.26 or later.
 
 ## Options
 
-| Option               | Default                           | What it does                                                        |
-|----------------------|-----------------------------------|---------------------------------------------------------------------|
-| `@telemetry-ignore`  | empty                             | sessions never logged, space separated                              |
-| `@telemetry-trunk`   | `main master`                     | branches recorded by folder name, space separated                   |
-| `@telemetry-labels`  | `Bench Research Meeting Hardware` | window names recorded in place of the branch, space separated       |
-| `@telemetry-idle`    | `5`                               | minutes without a key pressed before asking whether anyone is there |
-| `@telemetry-restart` | `15`                              | minutes a gap can last and still be a restart, recorded as AFK      |
+| Option                    | Default                   | What it does                                                        |
+|---------------------------|---------------------------|---------------------------------------------------------------------|
+| `@telemetry-ignore`       | empty                     | sessions never logged, space separated                              |
+| `@telemetry-trunk`        | `main master`             | branches recorded by folder name, space separated                   |
+| `@telemetry-labels`       | `Bench Research Hardware` | window names recorded in place of the branch, space separated       |
+| `@telemetry-idle`         | `5`                       | minutes without a key pressed before asking whether anyone is there |
+| `@telemetry-restart`      | `15`                      | minutes a gap can last and still be a restart, recorded as AFK      |
+| `@telemetry-meeting-key`  | `m`                       | prefix key that starts and ends a project meeting                   |
+| `@telemetry-external-key` | `M`                       | prefix key that starts and ends an external meeting                 |
 
 The records go to `$XDG_STATE_HOME/telemetry`, or to `$TELEMETRY_DIR` when set.
 

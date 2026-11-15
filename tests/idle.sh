@@ -36,7 +36,7 @@ check "answers" "$(rows)" "$(printf '%s\n' \
     '2001-09-09T01:46:41+00:00,lunch,,' \
     '2001-09-09T01:46:41+00:00,focus,Minecraft,Meeting' \
     '2001-09-09T01:46:41+00:00,focus,Minecraft,Meeting' \
-    '2001-09-09T01:46:41+00:00,focus,Minecraft,External' \
+    '2001-09-09T01:46:41+00:00,focus,External,Meeting' \
     '2001-09-09T01:46:41+00:00,focus,Minecraft,Bench' \
     '2001-09-09T01:46:41+00:00,focus,Minecraft,fixing the printer' \
     '2001-09-09T01:46:41+00:00,focus,Unnamed,Meeting')"
@@ -60,16 +60,17 @@ printf '%s\n' 'timestamp,event,session,context' '2001-08-31T23:59:00+00:00,focus
 check "carry on from the month before" "$(rows | tail -n 1)" '2001-09-01T00:00:01+00:00,focus,Minecraft,"notes, drafts"'
 rm -rf "$TELEMETRY_DIR"
 
-# quiet in a window already named afk or lunch asks nothing, as nobody is there
+# quiet in a window already named afk or lunch asks nothing, as nobody is there,
+# and nor does it in a meeting, which says where the time is going
 export TELEMETRY_TICK=1 TELEMETRY_IDLE_AFTER=3
-for away in afk Lunch; do
-    tmux -f /dev/null new-session -d -s Work -n "$away"
+for away in "Work afk" "Work Lunch" "<Work> notes" "[Work] notes"; do
+    tmux -f /dev/null new-session -d -s "${away% *}" -n "${away#* }"
     tmux run-shell "$ROOT/telemetry.tmux"
     python3 - <<'PY'
 import os, pty, select, time
 pid, fd = pty.fork()
 if pid == 0:
-    os.execvp("tmux", ["tmux", "attach", "-t", "Work"])
+    os.execvp("tmux", ["tmux", "attach"])
 start = time.time()
 while time.time() < start + 6:
     if select.select([fd], [], [], 0.2)[0]:
@@ -78,7 +79,7 @@ while time.time() < start + 6:
         except OSError:
             break
 PY
-    [ -e "$TELEMETRY_DIR/.asked" ] && { echo "idle: a window named $away should not be asked about"; failed=1; }
+    [ -e "$TELEMETRY_DIR/.asked" ] && { echo "idle: $away should not be asked about"; failed=1; }
     tmux kill-server
     sleep 2
     rm -rf "$TELEMETRY_DIR"

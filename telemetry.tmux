@@ -13,5 +13,11 @@ for hook in client-session-changed session-window-changed after-select-pane clie
 done
 tmux set-hook -g 'client-detached[42]' "run-shell -b '$TELEMETRY away'"
 
+# prefix m and M, unless set otherwise, start and end a project or an external meeting
+meeting_key=$(tmux show-option -gqv @telemetry-meeting-key)
+external_key=$(tmux show-option -gqv @telemetry-external-key)
+tmux bind-key "${meeting_key:-m}" run-shell -b "$TELEMETRY meeting #{pane_id}"
+tmux bind-key "${external_key:-M}" run-shell -b "$TELEMETRY external #{pane_id}"
+
 # the watcher has a session of its own, so it outlives tmux long enough to say when it stopped
 TELEMETRY_SOCKET=$(tmux display-message -p '#{socket_path}') setsid "$TELEMETRY" watch > /dev/null 2>&1 < /dev/null &

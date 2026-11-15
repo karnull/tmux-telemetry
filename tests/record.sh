@@ -54,11 +54,22 @@ attach popup; sleep 2
 step send -t popup 'true' Enter
 step detach-client -s popup
 step switch-client -t Work
+# a window named for a meeting is only a name now; the meeting keys say when one is on
 step rename-window -t Work: MEETING
 step rename-window -t Work: '!Meeting'
 step rename-window -t Work: afk
 step rename-window -t Work: Lunch
 step rename-window -t Work: notes
+# prefix m and M start and end a project meeting and an external one
+client=$(tmux list-clients -F '#{client_name}' | head -n 1)
+press() { tmux send-keys -K -c "$client" C-b "$1"; sleep 1; }
+press m
+press M
+external=$(tmux list-sessions -F '#{session_name}' | sort | xargs)
+press m
+press m
+press M
+press M
 # a trunk set with no ignore list must still be read as the trunk
 step set -gu @telemetry-ignore
 step set -g @telemetry-trunk feat/test
@@ -74,13 +85,22 @@ expected=$(printf '%s\n' \
     'focus,Other,Widget' \
     'focus,Other,' \
     'focus,Work,feat/test' \
-    'focus,Work,Meeting' \
-    'focus,Work,External' \
     'afk,,' \
     'lunch,,' \
     'focus,Work,feat/test' \
+    'focus,Work,Meeting' \
+    'focus,External,Meeting' \
+    'focus,Work,Meeting' \
+    'focus,Work,feat/test' \
+    'focus,External,Meeting' \
+    'focus,Work,feat/test' \
     'focus,Work,repo' \
     'away,,')
+
+if [ "$external" != "[Other] [Work] [popup]" ]; then
+    echo "record: an external meeting should mark every session, got $external"
+    exit 1
+fi
 
 if [ "$actual" == "$expected" ]; then
     echo "record: ok"

@@ -22,8 +22,10 @@ func TestAnswer(t *testing.T) {
 		{"lunch", Lunch, "", ""},
 		{"p", Focus, "Minecraft", "Meeting"},
 		{"m", Focus, "Minecraft", "Meeting"},
-		{"e", Focus, "Minecraft", "External"},
-		{"!Meeting", Focus, "Minecraft", "External"},
+		{"meeting", Focus, "Minecraft", "Meeting"},
+		{"e", Focus, "External", "Meeting"},
+		{"External", Focus, "External", "Meeting"},
+		{"!Meeting", Focus, "External", "Meeting"},
 		{"research", Focus, "Minecraft", "Research"},
 		{"fixing the printer", Focus, "Minecraft", "fixing the printer"},
 	}

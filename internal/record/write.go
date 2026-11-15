@@ -9,10 +9,11 @@ import (
 )
 
 // labels are the window names the plugin records by name, as it spells them
-var labels = []string{"Bench", "Research", "Meeting", "Hardware"}
+var labels = []string{"Bench", "Research", "Hardware"}
 
 // Answer reads where a quiet spell went, the way the plugin's popup does: c to
-// carry on with the work given, a for AFK, e for External, p (or m) for Meeting,
+// carry on with the work given, a for AFK, e for an external meeting, which goes
+// to a session of its own, External, p (or m) for a meeting in the session given,
 // l for lunch, a label in any case, or anything else as typed. Work goes to the
 // session given, or Unnamed without one. An empty answer, or carrying on with
 // no work given, leaves the spell as it was.
@@ -36,10 +37,10 @@ func Answer(at time.Time, session, context, where string) (Record, bool) {
 		return Record{Time: at, Event: AFK}, true
 	case "l", "lunch":
 		return Record{Time: at, Event: Lunch}, true
-	case "p", "m":
+	case "p", "m", "meeting":
 		return focus("Meeting")
-	case "e", "!meeting":
-		return focus("External")
+	case "e", "external", "!meeting":
+		return Record{Time: at, Event: Focus, Session: "External", Context: "Meeting"}, true
 	}
 	for _, label := range labels {
 		if strings.EqualFold(where, label) {
