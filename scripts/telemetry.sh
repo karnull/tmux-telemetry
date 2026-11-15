@@ -175,14 +175,26 @@ resume() {
     fi
 }
 
-# One watcher at a time, however often the config is reloaded. Each look leaves
-# the time in .alive, so a look that comes far later than it should, after the
+# <pid>: the command it runs; slim Linux images have no ps, but always have /proc
+command_of() {
+    if [[ -r "/proc/$1/cmdline" ]]; then
+        tr '\0' ' ' < "/proc/$1/cmdline"
+    else
+        ps -o args= -p "$1" 2>/dev/null
+    fi
+}
+
+# One watcher at a time, and a reload of the config takes over from the one
+# running, so an updated plugin is the one keeping watch. Each look leaves the
+# time in .alive, so a look that comes far later than it should, after the
 # machine slept or the watcher was gone with tmux, knows where the gap began.
 watch() {
-    local pidfile="$LOGS/.watcher" alive="$LOGS/.alive" last now
+    local pidfile="$LOGS/.watcher" alive="$LOGS/.alive" last now old
     mkdir -p "$LOGS"
-    if [[ -s "$pidfile" ]] && kill -0 "$(< "$pidfile")" 2>/dev/null; then
-        return 0
+    old=$(cat "$pidfile" 2>/dev/null)
+    # the pid may since have gone to some other process, so only a watcher is stopped
+    if [[ "$old" =~ ^[0-9]+$ && "$(command_of "$old")" == *"$(basename "$SELF") watch"* ]]; then
+        kill "$old" 2>/dev/null
     fi
     echo $$ > "$pidfile"
 
@@ -262,10 +274,12 @@ ask() {
     read -rsn1
 
     clear
-    printf '\n  Where were you since %s?\n\n' "$(clock "$since")"
-    printf '  [c] carry on with what you were doing\n'
-    printf '  [a] AFK   [l] lunch   [m] Meeting   [e] External\n'
-    printf '  or type what it was; Enter alone leaves it UNATTENDED\n\n  > '
+    # l, m, a label or anything typed still work, as before, without crowding the list
+    printf '\n  Unattended since %s. Log activity:\n\n' "$(clock "$since")"
+    printf '  [a] AFK\n'
+    printf '  [e] External Meeting\n'
+    printf '  [p] Project Meeting\n'
+    printf '  [c] Continue Previous\n\n  > '
     read -re where
     answer "$since" "$session" "$where"
 
@@ -314,7 +328,7 @@ answer() {
         l|lunch)
             write_row "$at" lunch "" ""
             ;;
-        m)
+        p|m)
             write_row "$at" focus "$session" Meeting
             ;;
         e)

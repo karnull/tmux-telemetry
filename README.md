@@ -18,8 +18,10 @@ to no session. timesheet lists them but leaves them out of every total.
 
 ### When the day ends
 
-A watcher runs beside tmux. The day ends when tmux stops, or where the records
-stopped when the machine was turned off or hibernated. A gap shorter than
+A watcher runs beside tmux, and reloading the config starts a fresh one, so an
+updated plugin takes effect without restarting tmux. The day ends when tmux
+stops, or where the records stopped when the machine was turned off or
+hibernated. A gap shorter than
 `@telemetry-restart` minutes, from restarting the machine or tmux, goes down as
 AFK instead.
 
@@ -28,9 +30,10 @@ AFK instead.
 After `@telemetry-idle` minutes with no key pressed in tmux, a popup asks whether
 anyone is still there, unless the window in focus is named `afk` or `lunch`. No, or no answer in two minutes, records the time since
 the last key as UNATTENDED. On coming back, a second popup asks where you were:
-`c` to carry on with whatever was in focus before, as one stretch with it, `a`
-for AFK, `l` for lunch, `m` for Meeting, `e` for External, or anything typed,
-which goes to the session in focus. Enter alone leaves it UNATTENDED, to fill in
+`a` for AFK, `e` for an external meeting, `p` for a project meeting, recorded as
+Meeting, or `c` to carry on with whatever was in focus before, as one stretch
+with it. It also takes `l` for lunch, `m` for Meeting, or anything typed, which
+goes to the session in focus. Enter alone leaves it UNATTENDED, to fill in
 later from `timesheet -i`, which takes the same answers.
 
 `timesheet`, built from this repository, turns the records into a report: the

@@ -12,8 +12,8 @@ import (
 var labels = []string{"Bench", "Research", "Meeting", "Hardware"}
 
 // Answer reads where a quiet spell went, the way the plugin's popup does: c to
-// carry on with the work given, a for AFK, l for lunch, m for Meeting, e for
-// External, a label in any case, or anything else as typed. Work goes to the
+// carry on with the work given, a for AFK, e for External, p (or m) for Meeting,
+// l for lunch, a label in any case, or anything else as typed. Work goes to the
 // session given, or Unnamed without one. An empty answer, or carrying on with
 // no work given, leaves the spell as it was.
 func Answer(at time.Time, session, context, where string) (Record, bool) {
@@ -36,7 +36,7 @@ func Answer(at time.Time, session, context, where string) (Record, bool) {
 		return Record{Time: at, Event: AFK}, true
 	case "l", "lunch":
 		return Record{Time: at, Event: Lunch}, true
-	case "m":
+	case "p", "m":
 		return focus("Meeting")
 	case "e", "!meeting":
 		return focus("External")
