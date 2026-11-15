@@ -11,11 +11,12 @@ import (
 // labels are the window names the plugin records by name, as it spells them
 var labels = []string{"Bench", "Research", "Meeting", "Hardware"}
 
-// Answer reads where a quiet spell went, the way the plugin's popup does: a for
-// AFK, l for lunch, m for Meeting, e for External, a label in any case, or
-// anything else as typed. Work goes to the session given, or Unnamed without one.
-// An empty answer leaves the spell as it was.
-func Answer(at time.Time, session, where string) (Record, bool) {
+// Answer reads where a quiet spell went, the way the plugin's popup does: c to
+// carry on with the work given, a for AFK, l for lunch, m for Meeting, e for
+// External, a label in any case, or anything else as typed. Work goes to the
+// session given, or Unnamed without one. An empty answer, or carrying on with
+// no work given, leaves the spell as it was.
+func Answer(at time.Time, session, context, where string) (Record, bool) {
 	where = strings.TrimSpace(where)
 	if session == "" {
 		session = "Unnamed"
@@ -26,6 +27,11 @@ func Answer(at time.Time, session, where string) (Record, bool) {
 	switch strings.ToLower(where) {
 	case "":
 		return Record{}, false
+	case "c", "continue":
+		if context == "" {
+			return Record{}, false
+		}
+		return focus(context)
 	case "a", "afk":
 		return Record{Time: at, Event: AFK}, true
 	case "l", "lunch":

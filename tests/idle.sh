@@ -41,6 +41,24 @@ check "answers" "$(rows)" "$(printf '%s\n' \
     '2001-09-09T01:46:41+00:00,focus,Unnamed,Meeting')"
 rm -rf "$TELEMETRY_DIR"
 
+# carrying on gives the spell to what was last in focus before it, and nothing
+# when nothing was
+"$ROOT/scripts/telemetry.sh" answer 1000000000 Minecraft c
+check "nothing to carry on" "$(rows 2>/dev/null)" ""
+mkdir -p "$TELEMETRY_DIR"
+printf '%s\n' 'timestamp,event,session,context' \
+    '2001-09-09T01:40:00+00:00,focus,Minecraft,"notes, drafts"' \
+    '2001-09-09T01:45:00+00:00,focus,Cyberpunk,feat/chrome' \
+    '2001-09-09T01:46:40+00:00,idle,,' \
+    '2001-09-09T01:50:00+00:00,focus,Roblox,main' \
+    '2001-09-09T01:20:00+00:00,focus,Roblox,filled in late' > "$TELEMETRY_DIR/2001-09.csv"
+"$ROOT/scripts/telemetry.sh" answer 1000000000 Minecraft continue
+check "carry on" "$(rows | tail -n 1)" '2001-09-09T01:46:41+00:00,focus,Cyberpunk,feat/chrome'
+printf '%s\n' 'timestamp,event,session,context' '2001-08-31T23:59:00+00:00,focus,Minecraft,"notes, drafts"' > "$TELEMETRY_DIR/2001-08.csv"
+"$ROOT/scripts/telemetry.sh" answer 999302400 Roblox c
+check "carry on from the month before" "$(rows | tail -n 1)" '2001-09-01T00:00:01+00:00,focus,Minecraft,"notes, drafts"'
+rm -rf "$TELEMETRY_DIR"
+
 # a client goes quiet, says it is stepping away, comes back and says it was AFK
 export TELEMETRY_TICK=1 TELEMETRY_IDLE_AFTER=3
 tmux -f /dev/null new-session -d -s Work
