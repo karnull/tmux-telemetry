@@ -16,6 +16,8 @@ func TestAnswer(t *testing.T) {
 		context string
 	}{
 		{"c", Focus, "Minecraft", "main"},
+		{"e quarterly planning", Focus, "External", "quarterly planning"},
+		{"External  board review", Focus, "External", "board review"},
 		{"Continue", Focus, "Minecraft", "main"},
 		{"a", AFK, "", ""},
 		{"AFK", AFK, "", ""},

@@ -13,7 +13,8 @@ var labels = []string{"Bench", "Research", "Hardware"}
 
 // Answer reads where a quiet spell went, the way the plugin's popup does: c to
 // carry on with the work given, a for AFK, e for an external meeting, which goes
-// to a session of its own, External, p (or m) for a meeting in the session given,
+// to a session of its own, External, and e followed by what it was about for
+// that as its work in place of Meeting, p (or m) for a meeting in the session given,
 // l for lunch, a label in any case, or anything else as typed. Work goes to the
 // session given, or Unnamed without one. An empty answer, or carrying on with
 // no work given, leaves the spell as it was.
@@ -42,6 +43,9 @@ func Answer(at time.Time, session, context, where string) (Record, bool) {
 	case "e", "external", "!meeting":
 		return Record{Time: at, Event: Focus, Session: "External", Context: "Meeting"}, true
 	}
+	if word, about, ok := strings.Cut(where, " "); ok && (strings.EqualFold(word, "e") || strings.EqualFold(word, "external")) {
+		return Record{Time: at, Event: Focus, Session: "External", Context: strings.TrimSpace(about)}, true
+	}
 	for _, label := range labels {
 		if strings.EqualFold(where, label) {
 			return focus(label)
@@ -50,7 +54,7 @@ func Answer(at time.Time, session, context, where string) (Record, bool) {
 	return focus(where)
 }
 
-var eventNames = map[Event]string{Focus: "focus", Away: "away", Lunch: "lunch", AFK: "afk", Idle: "idle"}
+var eventNames = map[Event]string{Focus: "focus", Away: "away", Lunch: "lunch", AFK: "afk", Idle: "idle", Topic: "topic"}
 
 // Append adds a record to its month's file, as the plugin would have written it.
 func Append(dir string, rec Record) error {
