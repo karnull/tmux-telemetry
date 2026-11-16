@@ -22,7 +22,9 @@ Prefix `m` starts a meeting about the project in focus: its session shows as
 pane shows, so you can carry on doodling. Prefix `M` starts an external meeting,
 which belongs to no project: every session shows as `[Minecraft]`, and the time
 goes down as Meeting under a session of its own, External. The same key again
-ends the meeting, and starting one ends any other. `@telemetry-meeting-key` and
+ends the meeting, and starting one ends any other. Ending an external meeting
+opens a popup asking what it was about, and the answer stands in for Meeting as
+its work; Enter alone leaves it as Meeting. A project meeting stays as Meeting. `@telemetry-meeting-key` and
 `@telemetry-external-key` choose other keys, for anyone who would rather keep
 tmux's own prefix `m` and `M` for marking panes.
 
@@ -41,7 +43,8 @@ After `@telemetry-idle` minutes with no key pressed in tmux, a popup asks whethe
 anyone is still there, unless the window in focus is named `afk` or `lunch` or a
 meeting is on. No, or no answer in two minutes, records the time since
 the last key as UNATTENDED. On coming back, a second popup asks where you were:
-`a` for AFK, `e` for an external meeting, recorded under External, `p` for a
+`a` for AFK, `e` for an external meeting, recorded under External and asked what
+it was about, `p` for a
 meeting about the session in focus, recorded as Meeting, or `c` to carry on with whatever was in focus before, as one stretch
 with it. It also takes `l` for lunch, `m` for Meeting, or anything typed, which
 goes to the session in focus. Enter alone leaves it UNATTENDED, to fill in
@@ -107,12 +110,12 @@ timestamp,event,session,context
 2026-11-10T13:32:08+11:00,focus,Cyberpunk,~/notes
 ```
 
-| Column      | What it holds                                                                                                                                    |
-|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
-| `timestamp` | RFC 3339, with the offset                                                                                                                        |
-| `event`     | `focus` when a pane gains focus or shows a prompt, `away` on detach, `lunch` and `afk` for those windows and a restart, `idle` for a quiet spell |
-| `session`   | the tmux session                                                                                                                                 |
-| `context`   | the window's label; else the git branch; the folder name on the trunk; the folder outside git; empty at home                                     |
+| Column      | What it holds                                                                                                                                                                                               |
+|-------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `timestamp` | RFC 3339, with the offset                                                                                                                                                                                   |
+| `event`     | `focus` when a pane gains focus or shows a prompt, `away` on detach, `lunch` and `afk` for those windows and a restart, `idle` for a quiet spell, `topic` for what an external meeting begun then was about |
+| `session`   | the tmux session                                                                                                                                                                                            |
+| `context`   | the window's label; else the git branch; the folder name on the trunk; the folder outside git; empty at home                                                                                                |
 
 ## timesheet
 
@@ -173,6 +176,8 @@ status 2, and any other failure with 1. `timesheet completion zsh` (or `bash`,
   and straight back leaves one stretch, and passing through just before a detach
   or the end of the day isn't counted.
 * Detaching tmux counts as away until the next record.
+* External, for meetings that belong to no project, comes after every project,
+  just above AFK and the other breaks.
 * The totals table keeps each session's rows together, the sessions longest first
   and their work longest first within each.
 * AFK, lunch breaks and UNATTENDED time show in the totals table, the timetables
