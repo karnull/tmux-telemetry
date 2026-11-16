@@ -29,6 +29,13 @@ func (b Break) Name() string {
 // AFK is the label for time away from the keyboard.
 const AFK = "AFK"
 
+// External is the session of meetings that belong to no project, and Meeting the
+// work of one until it is said what it was about.
+const (
+	External = "External"
+	Meeting  = "Meeting"
+)
+
 // Work is what a stretch of time went on: a session, and a branch or folder in it,
 // or a break, which belongs to no session.
 type Work struct {
@@ -136,8 +143,13 @@ func clock(t time.Time) time.Duration {
 // dropped when tmux is detached or the day ends first.
 func buildDay(records []record.Record) []Entry {
 	var runs []run
+	var topics []record.Record
 	var last time.Duration
 	for _, rec := range records {
+		if rec.Event == record.Topic {
+			topics = append(topics, rec)
+			continue
+		}
 		t := clock(rec.Time)
 		w := Work{Session: rec.Session, Context: rec.Context}
 		// AFK belongs to no project, including when older versions recorded it as one's context
@@ -154,6 +166,9 @@ func buildDay(records []record.Record) []Entry {
 			runs = append(runs, run{work: w, away: away, start: t})
 		}
 		last = t
+	}
+	for _, topic := range topics {
+		name(runs, clock(topic.Time), topic.Session, topic.Context)
 	}
 
 	var entries []Entry
@@ -188,6 +203,27 @@ func buildDay(records []record.Record) []Entry {
 	return entries
 }
 
+// name gives the meeting under way at a moment its topic as its work, through any
+// breaks in it, up to the first other work after it.
+func name(runs []run, at time.Duration, session, topic string) {
+	meeting := Work{Session: session, Context: Meeting}
+	for i := range runs {
+		if i+1 < len(runs) && runs[i+1].start <= at {
+			continue
+		}
+		for j := i; j < len(runs); j++ {
+			switch {
+			case runs[j].work == meeting:
+				runs[j].work.Context = topic
+			case runs[j].away || runs[j].work.Break != NoBreak:
+			default:
+				return
+			}
+		}
+		return
+	}
+}
+
 // Total is the time spent on one piece of work across days.
 type Total struct {
 	Work
@@ -218,9 +254,14 @@ func Totals(days []Day) []Total {
 	return totals
 }
 
-// Sessions sums the time counted in each session across the days, longest first.
+// Sessions sums the time counted in each session across the days, longest first,
+// with External after every project.
 func Sessions(days []Day) []Total {
-	return sum(days, false, func(w Work) Work { return Work{Session: w.Session} })
+	sessions := sum(days, false, func(w Work) Work { return Work{Session: w.Session} })
+	sort.SliceStable(sessions, func(i, j int) bool {
+		return sessions[i].Session != External && sessions[j].Session == External
+	})
+	return sessions
 }
 
 func sum(days []Day, withAway bool, key func(Work) Work) []Total {

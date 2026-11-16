@@ -18,11 +18,12 @@ timestamp,event,session,context
 2026-11-10T15:00:00+11:00,lunch,,
 2026-11-10T16:00:00+11:00,afk,,
 2026-11-10T17:00:00+11:00,idle,,
+2026-11-10T18:00:00+11:00,topic,External,planning
 `))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Skipped != 0 || len(got.Records) != 7 {
+	if got.Skipped != 0 || len(got.Records) != 8 {
 		t.Fatalf("got %d records, %d skipped", len(got.Records), got.Skipped)
 	}
 	if got.Records[1].Event != Away {
@@ -30,6 +31,9 @@ timestamp,event,session,context
 	}
 	if got.Records[4].Event != Lunch || got.Records[5].Event != AFK || got.Records[6].Event != Idle {
 		t.Errorf("the last three records should be a lunch break, AFK and a quiet spell")
+	}
+	if got.Records[7].Event != Topic || got.Records[7].Context != "planning" {
+		t.Errorf("the last record should name a meeting's topic, got %+v", got.Records[7])
 	}
 	if c := got.Records[2].Context; c != "~/notes, drafts" {
 		t.Errorf("context with a comma came back as %q", c)

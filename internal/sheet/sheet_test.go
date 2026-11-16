@@ -283,3 +283,62 @@ func TestAnAnswerTakesUnattendedsPlace(t *testing.T) {
 		t.Errorf("AFK a second on should take the whole spell:\ngot\n%s\nwant\n%s", got, want)
 	}
 }
+
+func TestATopicNamesTheExternalMeeting(t *testing.T) {
+	recs := records("2026-11-12",
+		"09:00 Minecraft x",
+		"10:00 External Meeting",
+		"10:20 External Meeting",
+		"10:30",
+		"10:35 External Meeting",
+		"11:00 Minecraft x",
+		"11:30 External Meeting",
+		"12:00 Minecraft x",
+		"13:00 Minecraft x",
+	)
+	recs[3].Event = record.AFK
+	topic := records("2026-11-12", "10:00 External planning")[0]
+	topic.Event = record.Topic
+	days := Build(append(recs[:2], append([]record.Record{topic}, recs[2:]...)...))
+
+	want := strings.Join([]string{
+		"09:00 - 10:00 Minecraft x",
+		"10:00 - 10:30 External planning",
+		"10:30 - 10:35 AFK ",
+		"10:35 - 11:00 External planning",
+		"11:00 - 11:30 Minecraft x",
+		"11:30 - 12:00 External Meeting",
+		"12:00 - 13:00 Minecraft x",
+	}, "\n")
+	if got := timetable(days[0]); got != want {
+		t.Errorf("the topic should name its meeting through the AFK, and not the next one:\ngot\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestExternalComesAfterEveryProject(t *testing.T) {
+	recs := records("2026-11-12",
+		"09:00 External Meeting",
+		"12:00 Minecraft x",
+		"12:30 Cyberpunk y",
+		"13:00 Cyberpunk y",
+		"13:30 afk",
+		"14:00 Minecraft x",
+	)
+	recs[4] = record.Record{Time: recs[4].Time, Event: record.AFK}
+	days := Build(recs)
+
+	var got []string
+	for _, s := range Sessions(days) {
+		got = append(got, s.Session)
+	}
+	if strings.Join(got, " ") != "Cyberpunk Minecraft External" {
+		t.Errorf("sessions: got %v, want External after the projects though it is longest", got)
+	}
+	got = nil
+	for _, total := range Totals(days) {
+		got = append(got, total.Session)
+	}
+	if strings.Join(got, " ") != "Cyberpunk Minecraft External AFK" {
+		t.Errorf("totals: got %v, want External just above AFK", got)
+	}
+}

@@ -24,6 +24,8 @@ const (
 	Lunch
 	AFK
 	Idle
+	// Topic names what a meeting begun at its time was about, written once it ends
+	Topic
 )
 
 // Record is one row: the focused session and its branch or folder at a moment.
@@ -126,6 +128,11 @@ func parseRow(row []string) (Record, bool) {
 	case "idle":
 		rec.Event = Idle
 		rec.Session, rec.Context = "", ""
+	case "topic":
+		rec.Event = Topic
+		if rec.Session == "" || rec.Context == "" {
+			return Record{}, false
+		}
 	default:
 		return Record{}, false
 	}
