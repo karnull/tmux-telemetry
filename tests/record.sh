@@ -32,7 +32,7 @@ import os, pty, sys, time
 pid, fd = pty.fork()
 if pid == 0:
     os.execvp("tmux", ["tmux", "attach", "-t", sys.argv[1]])
-end = time.time() + 30
+end = time.time() + 40
 while time.time() < end:
     try:
         os.read(fd, 65536)
@@ -63,13 +63,18 @@ step rename-window -t Work: notes
 # prefix m and M start and end a project meeting and an external one
 client=$(tmux list-clients -F '#{client_name}' | head -n 1)
 press() { tmux send-keys -K -c "$client" C-b "$1"; sleep 1; }
+# ending an external meeting asks what it was about, in a popup typed into as a client is
+answer() { tmux send-keys -K -c "$client" "$@"; sleep 1; }
 press m
 press M
 external=$(tmux list-sessions -F '#{session_name}' | sort | xargs)
 press m
+answer Enter
 press m
 press M
 press M
+# answered once the meeting is over, so written after, but dated to its start
+answer p l a n n i n g Enter
 # a trunk set with no ignore list must still be read as the trunk
 step set -gu @telemetry-ignore
 step set -g @telemetry-trunk feat/test
@@ -94,6 +99,7 @@ expected=$(printf '%s\n' \
     'focus,Work,feat/test' \
     'focus,External,Meeting' \
     'focus,Work,feat/test' \
+    'topic,External,planning' \
     'focus,Work,repo' \
     'away,,')
 

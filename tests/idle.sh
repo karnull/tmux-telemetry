@@ -27,7 +27,7 @@ check() {
 }
 
 # each answer, a second after the spell began at 2001-09-09T01:46:40Z
-for where in "" a lunch p m e bench "fixing the printer"; do
+for where in "" a lunch p m e "e quarterly planning" bench "fixing the printer"; do
     "$ROOT/scripts/telemetry.sh" answer 1000000000 Minecraft "$where"
 done
 "$ROOT/scripts/telemetry.sh" answer 1000000000 "" Meeting
@@ -37,6 +37,7 @@ check "answers" "$(rows)" "$(printf '%s\n' \
     '2001-09-09T01:46:41+00:00,focus,Minecraft,Meeting' \
     '2001-09-09T01:46:41+00:00,focus,Minecraft,Meeting' \
     '2001-09-09T01:46:41+00:00,focus,External,Meeting' \
+    '2001-09-09T01:46:41+00:00,focus,External,quarterly planning' \
     '2001-09-09T01:46:41+00:00,focus,Minecraft,Bench' \
     '2001-09-09T01:46:41+00:00,focus,Minecraft,fixing the printer' \
     '2001-09-09T01:46:41+00:00,focus,Unnamed,Meeting')"

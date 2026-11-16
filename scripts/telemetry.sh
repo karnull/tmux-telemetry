@@ -38,7 +38,9 @@ Actions:
   answer <SINCE> <SESSION> <ANSWER>
                   log where the time since a quiet spell began went
   meeting <PANE>  start or end a project meeting in the pane's session
-  external <PANE> start or end an external meeting, which marks every session
+  external <PANE> start or end an external meeting, which marks every session;
+                  ending one asks what it was about
+  topic <SINCE>   in a popup, ask what the external meeting begun then was about
 
 Notes:
   - record and away are run by the tmux and shell hooks, not by hand
@@ -197,6 +199,37 @@ external_meeting() {
     tmux list-sessions -F '#{session_name}' | grep -q '^\[.*\]$'
 }
 
+# an external meeting keeps when it began, to ask once it ends what it was about
+external_begins() {
+    mkdir -p "$LOGS"
+    date +%s > "$LOGS/.external"
+}
+
+# <pane>: the external meeting has ended, so ask what it was about, once, however
+# many hooks see it end
+external_ends() {
+    local held="$LOGS/.external.$$" since session client
+    mv "$LOGS/.external" "$held" 2> /dev/null || return 0
+    since=$(< "$held")
+    rm -f "$held"
+    session=$(tmux display-message -p -t "$1" '#{session_id}')
+    client=$(tmux list-clients -t "$session" -F '#{client_name}' | head -n 1)
+    [[ -n "$client" ]] || return 0
+    tmux display-popup -c "$client" -E -w 66 -h 9 -T ' telemetry ' -e "TELEMETRY_DIR=$LOGS" \
+        "$(printf '%q ' "$SELF" topic "$since")" &
+}
+
+# <since>: runs in the popup. What the meeting was about goes down as its work in
+# place of Meeting, recorded as a topic for the meeting that began then.
+topic() {
+    local about
+    printf '\n  What was the external meeting from %s about?\n\n' "$(clock "$1")"
+    printf '  Enter alone leaves it as Meeting\n\n  > '
+    read -re about
+    [[ -n "$about" ]] && write_row "$(stamp "$1")" topic External "$about"
+    return 0
+}
+
 # <pane>: a project meeting starts or ends in the pane's session; one starting
 # ends any other meeting, external or not
 toggle_meeting() {
@@ -206,6 +239,7 @@ toggle_meeting() {
     if [[ "$name" == "<"?*">" ]]; then
         tmux rename-session -t "$id" "${name:1:-1}"
     else
+        external_meeting && external_ends "$1"
         mark_sessions ""
         unmark name "$name"
         tmux rename-session -t "$id" "<$name>"
@@ -217,10 +251,14 @@ toggle_meeting() {
 toggle_external() {
     if external_meeting; then
         mark_sessions ""
+        external_ends "$1"
+        record_pane "$1"
     else
         mark_sessions "[]"
+        record_pane "$1"
+        # after its first record, so the topic is dated within the meeting
+        external_begins
     fi
-    record_pane "$1"
 }
 
 
@@ -329,7 +367,7 @@ check_quiet() {
 # leaves the time since the last key as UNATTENDED; once someone is back, they
 # can say where they were.
 ask() {
-    local since=$1 session=$2 client=$3 key where
+    local since=$1 session=$2 client=$3 key where about
     printf '\n  Still there? Nothing typed since %s.\n\n' "$(clock "$since")"
     printf '  [y] yes, carry on        [n] no, stepping away\n\n'
     printf '  No answer in two minutes counts as away.\n'
@@ -350,6 +388,14 @@ ask() {
     printf '  [p] Project Meeting\n'
     printf '  [c] Continue Previous\n\n  > '
     read -re where
+    case "${where,,}" in
+        e|external|!meeting)
+            clear
+            printf '\n  What was the external meeting about?\n\n  Enter alone leaves it as Meeting\n\n  > '
+            read -re about
+            [[ -n "$about" ]] && where="e $about"
+            ;;
+    esac
     answer "$since" "$session" "$where"
 
     # the break ends now, rather than at the next prompt
@@ -404,6 +450,10 @@ answer() {
             # an external meeting belongs to no project, as with prefix M
             write_row "$at" focus External Meeting
             ;;
+        "e "?*|"external "?*)
+            # and what it was about stands in for Meeting
+            write_row "$at" focus External "${where#* }"
+            ;;
         *)
             context=$(label "$where" "$(option labels)") || context=$where
             write_row "$at" focus "$session" "$context"
@@ -446,6 +496,10 @@ case "$ACTION" in
 
     external)
         toggle_external "$1"
+        ;;
+
+    topic)
+        topic "$1"
         ;;
 
     ""|--help|-h|help)
