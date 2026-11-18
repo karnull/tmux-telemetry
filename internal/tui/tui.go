@@ -324,6 +324,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.goTo(period.Containing(period.Week, m.anchor()))
 	case key.Matches(msg, m.keys.ByMonth):
 		return m.goTo(period.Containing(period.Month, m.anchor()))
+	case key.Matches(msg, m.keys.ByYear):
+		return m.goTo(period.Containing(period.Year, m.anchor()))
 	case key.Matches(msg, m.keys.Reload):
 		return m, m.load()
 	}
@@ -664,18 +666,31 @@ func (m Model) summaryLayers() []*lipgloss.Layer {
 		out = append(out, layer(text, 0, headerHeight+1+i-start, fmt.Sprintf("total:%d", i)))
 	}
 
-	// the pie and its legend, each legend row opening its whole session
+	// the pie and its legend, each legend row opening its whole session, and the
+	// averages beside the pie, or under the legend when there is no room
 	sessions := sheet.Sessions(m.days)
 	right := m.width - left - gap
 	legend := render.Legend(m.theme, sessions)
+	averages := render.Averages(m.theme, sheet.Average(m.days))
 	radius := min(m.bodyHeight()-lipgloss.Height(legend)-1, right/2, 12)
+	beside := 2*radius+gap+lipgloss.Width(averages) <= right
+	if !beside {
+		radius = min(radius, m.bodyHeight()-lipgloss.Height(legend)-lipgloss.Height(averages)-2)
+	}
 	y := headerHeight
-	if radius >= 3 {
-		pie := render.Pie(m.theme, sessions, radius)
-		out = append(out, layer(pie, left+gap, y, ""))
-		y += lipgloss.Height(pie) + 1
+	if radius < 3 {
+		beside = false
+	} else {
+		out = append(out, layer(render.Pie(m.theme, sessions, radius), left+gap, y, ""))
+		if beside {
+			out = append(out, layer(averages, left+gap+2*radius+gap, y+max(0, radius-lipgloss.Height(averages))/2, ""))
+		}
+		y += radius + 1
 	}
 	out = append(out, lines(legend, left+gap, y, func(i int) string { return "legend:" + sessions[i].Session })...)
+	if !beside {
+		out = append(out, layer(averages, left+gap, y+lipgloss.Height(legend)+1, ""))
+	}
 	return out
 }
 

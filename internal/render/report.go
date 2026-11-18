@@ -39,7 +39,7 @@ func Summary(days []sheet.Day) string {
 	return s
 }
 
-// Report is the whole text report: totals, the pie, a timeline for each day, and
+// Report is the whole text report: totals, the pie with the averages, a timeline for each day, and
 // each day's timetable when asked for.
 func Report(t Theme, p period.Period, days []sheet.Day, opts Options) string {
 	grand := sheet.Grand(days)
@@ -51,7 +51,7 @@ func Report(t Theme, p period.Period, days []sheet.Day, opts Options) string {
 	sections := []string{
 		header + "  " + t.faint(Summary(days)),
 		Totals(t, sheet.Totals(days), grand),
-		PieWithLegend(t, sheet.Sessions(days), 6),
+		PieWithLegend(t, sheet.Sessions(days), sheet.Average(days), 6, opts.Width),
 		Timelines(t, days, opts.Width),
 	}
 	if opts.Timetables {

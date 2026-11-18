@@ -51,8 +51,8 @@ goes to the session in focus. Enter alone leaves it UNATTENDED, to fill in
 later from `timesheet -i`, which takes the same answers.
 
 `timesheet`, built from this repository, turns the records into a report: the
-time spent on each session and branch, a pie chart of the sessions, a timeline
-of every day, and an interactive view to browse it all.
+time spent on each session and branch, a pie chart of the sessions beside the
+average day, a timeline of every day, and an interactive view to browse it all.
 
 [![Copier](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/copier-org/copier/master/img/badge/badge-grayscale-inverted-border-orange.json)](https://github.com/karshosphere/template-go)
 
@@ -101,7 +101,14 @@ The records go to `$XDG_STATE_HOME/telemetry`, or to `$TELEMETRY_DIR` when set.
 
 ## Records
 
-Each month is one CSV file, such as `2026-11.csv`:
+The week's records go to `week.csv`. The first record of each week, from Monday,
+moves those from the weeks before into a file for their year, such as
+`2026.csv`. On the way, repeats are folded together: a pane opened, or a switch
+back and forth within the same work, can log the same session and work many
+times over, and within a day a record the same as the ones either side of it
+says nothing new, so only the first and last of each run are kept. Every total
+and stretch comes out as it did. Monthly files, such as `2026-11.csv`, from
+before this layout are still read.
 
 ```csv
 timestamp,event,session,context
@@ -128,24 +135,27 @@ timesheet --day 11/04/2026       # the 11th of April
 timesheet --week 25,2026         # ISO week 25 of 2026
 timesheet --week --current       # this week so far
 timesheet --month "April 2026"
+timesheet --year --current       # this year so far
 timesheet 2026-W25               # a period on its own is read by its form
 timesheet --since monday         # a range, to today unless --until says
 ```
 
-`--day`, `--week` and `--month` take a period of their own, or pair with
-`--current` or `--previous` (the default) on their own. Short options group the
-POSIX way, so `-cd` is today and `-pm` the previous month.
+`--day`, `--week`, `--month` and `--year` take a period of their own, or pair
+with `--current` or `--previous` (the default) on their own. Short options group
+the POSIX way, so `-cd` is today and `-pm` the previous month.
 
 | Period    | Forms it takes                                                      |
 |-----------|---------------------------------------------------------------------|
 | `--day`   | `11/04/2026`, `11/04`, `2026-04-11`, `today`, `yesterday`, `monday` |
 | `--week`  | `25,2026`, `2026-W25`, `W25`, `25`, or any day in the week          |
 | `--month` | `04/2026`, `2026-04`, `April 2026`, `april`, `4`, or any day in it  |
+| `--year`  | `2026`, or any day in it                                            |
 
 Days go day first, so `11/04/2026` is the 11th of April. Weeks are ISO weeks,
 Monday to Sunday, and a weekday name is the latest one, today included. Without
-`--day`, `--week` or `--month`, a bare number could be any of them and is
-refused, and `04/2026` reads as a month.
+`--day`, `--week`, `--month` or `--year`, a number of four digits reads as a
+year, a shorter one could be any of the others and is refused, and `04/2026`
+reads as a month.
 
 | Option                | What it does                                                     |
 |-----------------------|------------------------------------------------------------------|
@@ -180,6 +190,9 @@ status 2, and any other failure with 1. `timesheet completion zsh` (or `bash`,
   just above AFK and the other breaks.
 * The totals table keeps each session's rows together, the sessions longest first
   and their work longest first within each.
+* Beside the pie chart, the averages give the typical day: when work started
+  and stopped, from the first and last work of each day that had some; lunch,
+  over the days with a lunch break; and AFK, over every day.
 * AFK, lunch breaks and UNATTENDED time show in the totals table, the timetables
   and the timeline, AFK as a faint `z`, lunch as faint dots and UNATTENDED as
   faint question marks, but are left out of each session's total, the pie chart
@@ -203,7 +216,7 @@ periods, so the same work can be followed week to week.
 |--------------------|-----------------------------------------------|
 | `tab`, `1` `2` `3` | summary, days, timeline                       |
 | `←` `→`, `h` `l`   | the period before or after                    |
-| `d` `w` `m`        | switch to a day, a week or a month            |
+| `d` `w` `m` `y`    | switch to a day, a week, a month or a year    |
 | `c`                | back to the current period                    |
 | `↑` `↓`, `j` `k`   | move through the totals or the days           |
 | `J` `K`            | move through the day's entries                |
@@ -226,7 +239,9 @@ make release          # cross-compile each release target into dist/
 ```
 
 `tests/record.sh`, `tests/watch.sh` and `tests/idle.sh` drive a private tmux
-server, and need tmux, zsh, git and python3, all of which the dev container has. CI runs the four make targets in
+server, and need tmux, zsh, git and python3, and `tests/roll.sh` builds
+timesheet to check a roll changes nothing it reports, all of which the dev
+container has. CI runs the four make targets in
 the dev container on every pull request, and publishes a release on each merge
 to main, with its version worked out from the commit messages.
 

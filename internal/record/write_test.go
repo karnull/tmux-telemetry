@@ -59,7 +59,7 @@ func TestAppendReadsBack(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	body, _ := os.ReadFile(filepath.Join(dir, "2026-11.csv"))
+	body, _ := os.ReadFile(filepath.Join(dir, "week.csv"))
 	want := "timestamp,event,session,context\n" +
 		"2026-11-12T10:00:01+11:00,idle,,\n" +
 		"2026-11-12T10:00:02+11:00,focus,Minecraft,\"notes, drafts\"\n"

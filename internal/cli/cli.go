@@ -28,7 +28,7 @@ func usagef(format string, args ...any) error {
 	return UsageError{fmt.Errorf(format, args...)}
 }
 
-// unitFlag is --day, --week or --month: on its own like a switch, or with the
+// unitFlag is --day, --week, --month or --year: on its own like a switch, or with the
 // period itself, as --day=11/04/2026 or --day 11/04/2026.
 type unitFlag struct {
 	on    bool
@@ -57,6 +57,7 @@ func (f *unitFlag) IsBoolFlag() bool { return true }
 type options struct {
 	previous, current bool
 	day, week, month  unitFlag
+	year              unitFlag
 	when              string
 
 	since, until string
@@ -95,8 +96,8 @@ func New(env Env) *cobra.Command {
 session and branch, each session's share as a pie chart, and a timeline of
 every day. Without a period, it reports the previous week.
 
---day, --week and --month take a period of their own, or pair with --current or
---previous on their own. A period given without them is read by its form.
+--day, --week, --month and --year take a period of their own, or pair with
+--current or --previous on their own. A period given without them is read by its form.
 
 Days go day first: 11/04/2026 is the 11th of April. Weeks are ISO weeks, Monday
 to Sunday. Short options group the POSIX way, so -cd is -c -d: today.`,
@@ -117,9 +118,10 @@ timesheet 11/04/2026
 timesheet 2026-W25
 timesheet 04/2026
 
-# this week so far, and the previous month
+# this week so far, the previous month, and this year so far
 timesheet -cw
 timesheet -pm
+timesheet --year --current
 
 # every stretch spent on one branch last week, or on a whole session this month
 timesheet --session Minecraft --work chore/get-started
@@ -156,14 +158,15 @@ timesheet -pm -f csv > november.csv`,
 
 	f := cmd.Flags()
 	f.SortFlags = false
-	f.BoolVarP(&opts.current, "current", "c", false, "the day, week or month in progress")
-	f.BoolVarP(&opts.previous, "previous", "p", false, "the day, week or month before it (the default)")
+	f.BoolVarP(&opts.current, "current", "c", false, "the day, week, month or year in progress")
+	f.BoolVarP(&opts.previous, "previous", "p", false, "the day, week, month or year before it (the default)")
 	unit := func(v *unitFlag, name, short, usage string) {
 		f.VarPF(v, name, short, usage).NoOptDefVal = "true"
 	}
 	unit(&opts.day, "day", "d", "a day, such as "+period.DayForms)
 	unit(&opts.week, "week", "w", "a week, such as "+period.WeekForms+" (the default)")
 	unit(&opts.month, "month", "m", "a month, such as "+period.MonthForms)
+	unit(&opts.year, "year", "y", "a year, such as "+period.YearForms)
 	f.StringVarP(&opts.since, "since", "s", "", "first day of a range, in any form --day takes")
 	f.StringVarP(&opts.until, "until", "u", "", "last day of a range, in any form --day takes (default today)")
 	f.StringVar(&opts.dir, "dir", "", "where the records are (default $TELEMETRY_DIR, or $XDG_STATE_HOME/telemetry)")
@@ -188,13 +191,13 @@ type unitChoice struct {
 // resolve picks the period the flags and operand ask for, as of today.
 func (o options) resolve(today record.Date) (period.Period, error) {
 	var picked []unitChoice
-	for _, u := range []unitChoice{{o.day, period.Day, "--day"}, {o.week, period.Week, "--week"}, {o.month, period.Month, "--month"}} {
+	for _, u := range []unitChoice{{o.day, period.Day, "--day"}, {o.week, period.Week, "--week"}, {o.month, period.Month, "--month"}, {o.year, period.Year, "--year"}} {
 		if u.flag.on {
 			picked = append(picked, u)
 		}
 	}
 	if len(picked) > 1 {
-		return period.Period{}, usagef("pick one of --day, --week or --month")
+		return period.Period{}, usagef("pick one of --day, --week, --month or --year")
 	}
 	if o.current && o.previous {
 		return period.Period{}, usagef("pick one of --current or --previous")
@@ -247,6 +250,8 @@ func parseWhen(when string, picked []unitChoice, today record.Date) (period.Peri
 		return period.Containing(period.Day, day), err
 	case period.Month:
 		return period.ParseMonth(when, today)
+	case period.Year:
+		return period.ParseYear(when, today)
 	default:
 		return period.ParseWeek(when, today)
 	}

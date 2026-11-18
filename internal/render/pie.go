@@ -105,11 +105,34 @@ func Legend(t Theme, sessions []sheet.Total) string {
 	return strings.Join(lines, "\n")
 }
 
-// PieWithLegend sets the legend beside the pie, centred on it.
-func PieWithLegend(t Theme, sessions []sheet.Total, radius int) string {
+// PieWithLegend sets the legend beside the pie, centred on it, and the averages
+// beside the legend, or under it when there is no room within width.
+func PieWithLegend(t Theme, sessions []sheet.Total, averages sheet.Averages, radius, width int) string {
 	pie := Pie(t, sessions, radius)
 	if pie == "" {
-		return ""
+		return Averages(t, averages)
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Center, pie, "    ", Legend(t, sessions))
+	legend, typical := Legend(t, sessions), Averages(t, averages)
+	side := lipgloss.JoinHorizontal(lipgloss.Center, legend, "    ", typical)
+	if lipgloss.Width(pie)+4+lipgloss.Width(side) > width {
+		side = legend + "\n\n" + typical
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Center, pie, "    ", side)
+}
+
+// Averages lists the typical day, to sit beside the pie.
+func Averages(t Theme, a sheet.Averages) string {
+	value := func(has bool, s string) string {
+		if !has {
+			return t.faint("    -")
+		}
+		return fmt.Sprintf("%5s", s)
+	}
+	return strings.Join([]string{
+		t.bold("Averages"),
+		"Start  " + value(a.Has.Start, sheet.Clock(a.Start)),
+		"Leave  " + value(a.Has.Start, sheet.Clock(a.Leave)),
+		"Lunch  " + value(a.Has.Lunch, sheet.Hours(a.Lunch)),
+		"AFK    " + value(a.Has.AFK, sheet.Hours(a.AFK)),
+	}, "\n")
 }

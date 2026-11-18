@@ -59,6 +59,10 @@ check "carry on" "$(rows | tail -n 1)" '2001-09-09T01:46:41+00:00,focus,Cyberpun
 printf '%s\n' 'timestamp,event,session,context' '2001-08-31T23:59:00+00:00,focus,Minecraft,"notes, drafts"' > "$TELEMETRY_DIR/2001-08.csv"
 "$ROOT/scripts/telemetry.sh" answer 999302400 Roblox c
 check "carry on from the month before" "$(rows | tail -n 1)" '2001-09-01T00:00:01+00:00,focus,Minecraft,"notes, drafts"'
+rm "$TELEMETRY_DIR/2001-08.csv"
+printf '%s\n' 'timestamp,event,session,context' '2001-08-31T23:58:00+00:00,focus,Cyberpunk,rolled' > "$TELEMETRY_DIR/2001.csv"
+"$ROOT/scripts/telemetry.sh" answer 999302400 Roblox c
+check "carry on from a year rolled over" "$(rows | tail -n 1)" '2001-09-01T00:00:01+00:00,focus,Cyberpunk,rolled'
 rm -rf "$TELEMETRY_DIR"
 
 # quiet in a window already named afk or lunch asks nothing, as nobody is there,

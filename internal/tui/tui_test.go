@@ -79,7 +79,7 @@ func press(m Model, keys ...string) Model {
 func TestSummaryShowsTheWeek(t *testing.T) {
 	m := newModel(t)
 	view := m.View().Content
-	for _, want := range []string{"Week 46", "Roblox", "release-1.0", "2:00"} {
+	for _, want := range []string{"Week 46", "Roblox", "release-1.0", "2:00", "Averages", "Start  09:00", "Leave  11:00"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("summary is missing %q:\n%s", want, view)
 		}
@@ -105,6 +105,9 @@ func TestPeriodsMoveButNotPastToday(t *testing.T) {
 	m = press(m, "m", "left")
 	if !strings.Contains(m.View().Content, "October 2026") || !strings.Contains(m.View().Content, "Minecraft") {
 		t.Errorf("m then left should show October:\n%s", m.View().Content)
+	}
+	if y := press(m, "y").View().Content; strings.Contains(y, "October 2026") || !strings.Contains(y, "2026") || !strings.Contains(y, "Minecraft") {
+		t.Errorf("y should show the whole of 2026:\n%s", y)
 	}
 	m = press(m, "c")
 	if !strings.Contains(m.View().Content, "November 2026") {

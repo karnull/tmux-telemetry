@@ -14,6 +14,7 @@ type keyMap struct {
 	ByDay     key.Binding
 	ByWeek    key.Binding
 	ByMonth   key.Binding
+	ByYear    key.Binding
 	Up        key.Binding
 	Down      key.Binding
 	EntryUp   key.Binding
@@ -40,6 +41,7 @@ func newKeyMap() keyMap {
 		ByDay:     key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "by day")),
 		ByWeek:    key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "by week")),
 		ByMonth:   key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "by month")),
+		ByYear:    key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "by year")),
 		Up:        key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up")),
 		Down:      key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
 		EntryUp:   key.NewBinding(key.WithKeys("K", "shift+up"), key.WithHelp("K", "entry up")),
@@ -61,7 +63,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.NextView, k.PrevView, k.Summary, k.Days, k.Timeline},
-		{k.Earlier, k.Later, k.Today, k.ByDay, k.ByWeek, k.ByMonth},
+		{k.Earlier, k.Later, k.Today, k.ByDay, k.ByWeek, k.ByMonth, k.ByYear},
 		{k.Up, k.Down, k.EntryUp, k.EntryDown},
 		{k.Open, k.Session, k.Fill, k.Back, k.Reload, k.Help, k.Quit},
 	}
