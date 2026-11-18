@@ -37,6 +37,9 @@ func TestShift(t *testing.T) {
 	if p := Containing(Day, date(2026, 3, 1)).Shift(-1); !p.First.Equal(date(2026, 2, 28)) {
 		t.Errorf("the day before 01/03 is %s", p.First)
 	}
+	if p := Containing(Year, date(2024, 2, 29)).Shift(1); !p.First.Equal(date(2025, 1, 1)) || !p.Last.Equal(date(2025, 12, 31)) {
+		t.Errorf("the year after 2024: got %s to %s", p.First, p.Last)
+	}
 	r, _ := Between(date(2026, 11, 1), date(2026, 11, 10))
 	if p := r.Shift(1); !p.First.Equal(date(2026, 11, 11)) || !p.Last.Equal(date(2026, 11, 20)) {
 		t.Errorf("a ten-day range steps ten days: got %s to %s", p.First, p.Last)
@@ -54,6 +57,9 @@ func TestTitle(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 	if got := Containing(Month, date(2026, 11, 12)).Title(); got != "November 2026" {
+		t.Errorf("got %q", got)
+	}
+	if got := Containing(Year, date(2026, 11, 12)).Title(); got != "2026" {
 		t.Errorf("got %q", got)
 	}
 	if got := Containing(Day, date(2026, 11, 10)).Title(); got != "Tuesday 10/11/2026" {

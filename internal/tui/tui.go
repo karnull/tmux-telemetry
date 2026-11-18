@@ -324,6 +324,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.goTo(period.Containing(period.Week, m.anchor()))
 	case key.Matches(msg, m.keys.ByMonth):
 		return m.goTo(period.Containing(period.Month, m.anchor()))
+	case key.Matches(msg, m.keys.ByYear):
+		return m.goTo(period.Containing(period.Year, m.anchor()))
 	case key.Matches(msg, m.keys.Reload):
 		return m, m.load()
 	}

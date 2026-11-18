@@ -93,6 +93,20 @@ func TestParseMonth(t *testing.T) {
 	}
 }
 
+func TestParseYear(t *testing.T) {
+	for in, want := range map[string]time.Time{"2025": day0(2025, 1, 1), " 2026 ": day0(2026, 1, 1), "11/04/2024": day0(2024, 1, 1)} {
+		got, err := ParseYear(in, today)
+		if err != nil || got.Unit != Year || !got.First.Equal(want) || !got.Last.Equal(want.AddDate(1, 0, -1)) {
+			t.Errorf("%q: got %s to %s %v, want the year from %s", in, got.First.Format(time.DateOnly), got.Last.Format(time.DateOnly), err, want.Format(time.DateOnly))
+		}
+	}
+	for _, bad := range []string{"26", "20266", "next year"} {
+		if _, err := ParseYear(bad, today); err == nil {
+			t.Errorf("%q should not be a year", bad)
+		}
+	}
+}
+
 func TestGuess(t *testing.T) {
 	tests := []struct {
 		in    string
@@ -107,6 +121,7 @@ func TestGuess(t *testing.T) {
 		{"04/2026", Month, day0(2026, 4, 1)},
 		{"2026-04", Month, day0(2026, 4, 1)},
 		{"april", Month, day0(2026, 4, 1)},
+		{"2025", Year, day0(2025, 1, 1)},
 	}
 	for _, tt := range tests {
 		got, err := Guess(tt.in, today)

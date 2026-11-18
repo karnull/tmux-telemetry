@@ -106,6 +106,9 @@ func TestPeriodsMoveButNotPastToday(t *testing.T) {
 	if !strings.Contains(m.View().Content, "October 2026") || !strings.Contains(m.View().Content, "Minecraft") {
 		t.Errorf("m then left should show October:\n%s", m.View().Content)
 	}
+	if y := press(m, "y").View().Content; strings.Contains(y, "October 2026") || !strings.Contains(y, "2026") || !strings.Contains(y, "Minecraft") {
+		t.Errorf("y should show the whole of 2026:\n%s", y)
+	}
 	m = press(m, "c")
 	if !strings.Contains(m.View().Content, "November 2026") {
 		t.Errorf("c should come back to the current month")

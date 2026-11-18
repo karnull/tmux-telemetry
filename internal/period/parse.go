@@ -15,6 +15,7 @@ const (
 	DayForms   = "11/04/2026, 11/04, 2026-04-11, today, yesterday or a weekday"
 	WeekForms  = "25,2026, 2026-W25, W25, 25 or any day in it"
 	MonthForms = "04/2026, 2026-04, April 2026, april, 4 or any day in it"
+	YearForms  = "2026 or any day in it"
 )
 
 var (
@@ -27,6 +28,7 @@ var (
 	monthYear    = regexp.MustCompile(`^(\d{1,2})[/.](\d{4})$`)
 	isoMonth     = regexp.MustCompile(`^(\d{4})-(\d{1,2})$`)
 	number       = regexp.MustCompile(`^\d{1,2}$`)
+	bareYear     = regexp.MustCompile(`^\d{4}$`)
 )
 
 func atoi(s string) int {
@@ -168,15 +170,30 @@ func ParseMonth(s string, today record.Date) (Period, error) {
 	return Period{}, fmt.Errorf("%q is not a month; try one such as %s", s, MonthForms)
 }
 
-// Guess reads a day, week or month from its form alone, for when no option says
-// which. A bare number could be any of them, so it is refused.
+// ParseYear reads a year in any of YearForms.
+func ParseYear(s string, today record.Date) (Period, error) {
+	s = strings.TrimSpace(s)
+	if bareYear.MatchString(s) {
+		return Containing(Year, time.Date(atoi(s), 1, 1, 0, 0, 0, 0, time.UTC)), nil
+	}
+	if day, err := ParseDay(s, today); err == nil {
+		return Containing(Year, day), nil
+	}
+	return Period{}, fmt.Errorf("%q is not a year; try one such as %s", s, YearForms)
+}
+
+// Guess reads a day, week, month or year from its form alone, for when no option says
+// which. A number of one or two digits could be any but a year, so it is refused.
 func Guess(s string, today record.Date) (Period, error) {
 	s = strings.TrimSpace(s)
 	if number.MatchString(s) {
-		return Period{}, fmt.Errorf("%q could be a day, a week or a month; say which with --day, --week or --month", s)
+		return Period{}, fmt.Errorf("%q could be a day, a week or a month; say which with --day, --week, --month or --year", s)
 	}
 	if day, err := ParseDay(s, today); err == nil {
 		return Containing(Day, day), nil
+	}
+	if bareYear.MatchString(s) {
+		return ParseYear(s, today)
 	}
 	// NN/YYYY reads as a month here; with --week it is a week
 	if monthYear.MatchString(s) {
@@ -188,6 +205,6 @@ func Guess(s string, today record.Date) (Period, error) {
 	if p, err := ParseMonth(s, today); err == nil {
 		return p, nil
 	}
-	return Period{}, fmt.Errorf("%q is not a day, week or month I can read; try a day such as %s; a week such as %s; or a month such as %s",
-		s, DayForms, WeekForms, MonthForms)
+	return Period{}, fmt.Errorf("%q is not a day, week, month or year I can read; try a day such as %s; a week such as %s; a month such as %s; or a year such as %s",
+		s, DayForms, WeekForms, MonthForms, YearForms)
 }

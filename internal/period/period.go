@@ -16,10 +16,11 @@ const (
 	Week
 	Month
 	Range
+	Year
 )
 
 func (u Unit) String() string {
-	return [...]string{"day", "week", "month", "range"}[u]
+	return [...]string{"day", "week", "month", "range", "year"}[u]
 }
 
 // Period is the days from First to Last, inclusive.
@@ -32,7 +33,7 @@ type Period struct {
 // Today is the current day by the local clock.
 func Today() record.Date { return record.DateOf(time.Now()) }
 
-// Containing is the day, week or month a date falls in. Weeks run Monday to Sunday.
+// Containing is the day, week, month or year a date falls in. Weeks run Monday to Sunday.
 func Containing(unit Unit, date record.Date) Period {
 	switch unit {
 	case Week:
@@ -41,6 +42,9 @@ func Containing(unit Unit, date record.Date) Period {
 	case Month:
 		first := time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, time.UTC)
 		return Period{Unit: Month, First: first, Last: first.AddDate(0, 1, -1)}
+	case Year:
+		first := time.Date(date.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
+		return Period{Unit: Year, First: first, Last: first.AddDate(1, 0, -1)}
 	default:
 		return Period{Unit: Day, First: date, Last: date}
 	}
@@ -62,6 +66,8 @@ func (p Period) Shift(n int) Period {
 		return Containing(Week, p.First.AddDate(0, 0, 7*n))
 	case Month:
 		return Containing(Month, p.First.AddDate(0, n, 0))
+	case Year:
+		return Containing(Year, p.First.AddDate(n, 0, 0))
 	case Range:
 		length := p.Days()
 		return Period{Unit: Range, First: p.First.AddDate(0, 0, length*n), Last: p.Last.AddDate(0, 0, length*n)}
@@ -99,6 +105,8 @@ func (p Period) Title() string {
 		return fmt.Sprintf("Week %d, %s to %s", week, p.First.Format("Mon 02/01"), p.Last.Format("Sun 02/01/2006"))
 	case Month:
 		return p.First.Format("January 2006")
+	case Year:
+		return p.First.Format("2006")
 	default:
 		return fmt.Sprintf("%s to %s", p.First.Format("Mon 02/01/2006"), p.Last.Format("Mon 02/01/2006"))
 	}
