@@ -1,4 +1,5 @@
-// Package record reads the monthly CSV files tmux-telemetry writes.
+// Package record reads the CSV files tmux-telemetry writes: one for the current
+// week, one for each year before it, and one for each month from older versions.
 package record
 
 import (
@@ -9,7 +10,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -139,13 +142,29 @@ func parseRow(row []string) (Record, bool) {
 	return rec, true
 }
 
-// Load reads every record on the days from first to last, inclusive, in time order.
-func Load(dir string, first, last Date) (Result, error) {
-	var result Result
-
+// files lists the record files that can hold the days from first to last: the
+// week's, any a roll cut short left behind, each year's, and each month's as
+// older versions kept them.
+func files(dir string, first, last Date) []string {
+	paths := []string{filepath.Join(dir, "week.csv")}
+	rolling, _ := filepath.Glob(filepath.Join(dir, ".rolling.*.csv"))
+	paths = append(paths, rolling...)
+	for year := first.Year(); year <= last.Year(); year++ {
+		paths = append(paths, filepath.Join(dir, strconv.Itoa(year)+".csv"))
+	}
 	// a day's records sit in its own month's file, whatever the offset
 	for month := time.Date(first.Year(), first.Month(), 1, 0, 0, 0, 0, time.UTC); !month.After(last); month = month.AddDate(0, 1, 0) {
-		path := filepath.Join(dir, month.Format("2006-01")+".csv")
+		paths = append(paths, filepath.Join(dir, month.Format("2006-01")+".csv"))
+	}
+	return paths
+}
+
+// Load reads every record on the days from first to last, inclusive, in time
+// order. A record can be read twice while a roll is under way, so a repeat of the
+// one before it at the same moment is left out, as it changes nothing.
+func Load(dir string, first, last Date) (Result, error) {
+	var result Result
+	for _, path := range files(dir, first, last) {
 		file, err := os.Open(path)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
@@ -169,6 +188,9 @@ func Load(dir string, first, last Date) (Result, error) {
 
 	sort.SliceStable(result.Records, func(i, j int) bool {
 		return result.Records[i].Time.Before(result.Records[j].Time)
+	})
+	result.Records = slices.CompactFunc(result.Records, func(a, b Record) bool {
+		return a.Time.Equal(b.Time) && a.Event == b.Event && a.Session == b.Session && a.Context == b.Context
 	})
 	return result, nil
 }

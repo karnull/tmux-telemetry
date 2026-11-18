@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-# Logs which tmux session and git branch (or folder) has focus, as one CSV file a
-# month; timesheet turns the records into a report
+# Logs which tmux session and git branch (or folder) has focus, to a CSV file for
+# the week that is rolled into one for its year each Monday; timesheet turns the
+# records into a report
 
 ACTION=$1
 shift
@@ -41,6 +42,8 @@ Actions:
   external <PANE> start or end an external meeting, which marks every session;
                   ending one asks what it was about
   topic <SINCE>   in a popup, ask what the external meeting begun then was about
+  roll            add the weeks before this one to their year files, with repeated
+                  records folded together; the first record of a week does this
 
 Notes:
   - record and away are run by the tmux and shell hooks, not by hand
@@ -71,8 +74,11 @@ write_row() {
 
 # <timestamp> <event> <session and context, quoted as the records hold them>
 write_raw() {
-    local file="$LOGS/${1:0:7}.csv"
+    local file="$LOGS/week.csv" week rolled=""
     mkdir -p "$LOGS"
+    printf -v week '%(%G-W%V)T' -1
+    read -r rolled 2>/dev/null < "$LOGS/.week"
+    [[ "$rolled" == "$week" ]] || roll
     [ -s "$file" ] || echo "$HEADER" >> "$file"
     printf '%s,%s,%s\n' "$1" "$2" "$3" >> "$file"
 }
@@ -176,6 +182,114 @@ record_away() {
         [[ " $ignore " == *" $session "* ]] || return 0
     done < <(tmux list-clients -F '#{client_session}')
     append away "" ""
+}
+
+
+#-------------------------------------------------------------------------------
+# rolling the week over
+
+# The records go to week.csv, and the first record of each ISO week moves those
+# from before its Monday into a file for their year, such as 2026.csv. A writer
+# claims week.csv by renaming it to .rolling.<pid>.csv, and timesheet reads any
+# such file left by a roll cut short, so no record goes missing on the way.
+
+# <file>...: the records in time order with repeats folded together. Within a day,
+# a record the same as the ones either side of it says nothing new, as timesheet
+# counts a run of them as one stretch from its first to its last.
+fold() {
+    awk -F, '
+        # RFC 3339 as seconds since 1970, as awk has no dates of its own
+        function epoch(s,   y, m, d, offset, era, yoe, doe) {
+            y = substr(s, 1, 4) + 0; m = substr(s, 6, 2) + 0; d = substr(s, 9, 2) + 0
+            offset = 0
+            if (substr(s, 20, 1) != "Z") {
+                offset = substr(s, 21, 2) * 3600 + substr(s, 24, 2) * 60
+                if (substr(s, 20, 1) == "-") offset = -offset
+            }
+            if (m <= 2) y--
+            era = int(y / 400); yoe = y - era * 400
+            doe = yoe * 365 + int(yoe / 4) - int(yoe / 100) + int((153 * ((m + 9) % 12) + 2) / 5) + d - 1
+            return (era * 146097 + doe - 719468) * 86400 + substr(s, 12, 2) * 3600 + substr(s, 15, 2) * 60 + substr(s, 18, 2) - offset
+        }
+        $1 ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T/ { printf "%d\t%d\t%s\n", epoch($1), NR, $0 }
+    ' "$@" | sort -t $'\t' -k1,1n -k2,2n | cut -f 3- | awk '
+        function rest(s) { return substr(s, index(s, ",") + 1) }
+        { line[NR] = $0 }
+        END {
+            # a topic names a meeting rather than marking a moment, so runs pass through it
+            for (i = 1; i <= NR; i++) {
+                topic = rest(line[i]) ~ /^topic,/
+                if (!topic) {
+                    for (next_one = i + 1; next_one <= NR && rest(line[next_one]) ~ /^topic,/; next_one++) {}
+                    same_before = previous && substr(line[previous], 1, 10) == substr(line[i], 1, 10) && rest(line[previous]) == rest(line[i])
+                    same_after = next_one <= NR && substr(line[next_one], 1, 10) == substr(line[i], 1, 10) && rest(line[next_one]) == rest(line[i])
+                    previous = i
+                    if (same_before && same_after) continue
+                }
+                if (line[i] == printed) continue
+                print line[i]
+                printed = line[i]
+            }
+        }
+    '
+}
+
+# a lock left by a roll that never finished is taken over after ten minutes
+lock_roll() {
+    local lock="$LOGS/.rolling.lock"
+    mkdir "$lock" 2>/dev/null && return
+    [[ -n "$(find "$lock" -maxdepth 0 -mmin +10 2>/dev/null)" ]] || return 1
+    rmdir "$lock" 2>/dev/null
+    mkdir "$lock" 2>/dev/null
+}
+
+# <file> <first byte>: rows a writer added to a claimed file after it was read
+# go back to the week
+put_back() {
+    local week="$LOGS/week.csv"
+    (( $(wc -c < "$1") >= $2 )) || return 0
+    [ -s "$week" ] || echo "$HEADER" >> "$week"
+    tail -c +"$2" "$1" | grep -v '^timestamp' >> "$week"
+}
+
+roll() {
+    local week monday claimed="$LOGS/.rolling.$$.csv" file year rows rest sizes=()
+    mkdir -p "$LOGS"
+    lock_roll || return 0
+    printf -v week '%(%G-W%V)T' -1
+    # Monday at noon, so a clock change in the week can't move it a day
+    monday=$(date -d "$(printf '%(%Y-%m-%d)T' -1) 12:00 $(( $(printf '%(%u)T' -1) - 1 )) days ago" +%Y-%m-%d)
+    [[ -s "$LOGS/week.csv" ]] && mv "$LOGS/week.csv" "$claimed"
+    echo "$week" > "$LOGS/.week"
+
+    shopt -s nullglob
+    local claims=("$LOGS"/.rolling.*.csv)
+    shopt -u nullglob
+    if (( ${#claims[@]} )); then
+        for file in "${claims[@]}"; do
+            sizes+=("$(wc -c < "$file")")
+        done
+        rows=$(for i in "${!claims[@]}"; do head -c "${sizes[i]}" "${claims[i]}"; echo; done | grep -v '^timestamp' | grep .)
+        # this week's records stay in the week
+        rest=$(awk -v monday="$monday" '/^[0-9]/ && substr($0, 1, 10) >= monday' <<< "$rows")
+        if [[ -n "$rest" ]]; then
+            [ -s "$LOGS/week.csv" ] || echo "$HEADER" >> "$LOGS/week.csv"
+            echo "$rest" >> "$LOGS/week.csv"
+        fi
+        for year in $(awk -v monday="$monday" '/^[0-9]/ && substr($0, 1, 10) < monday { print substr($0, 1, 4) }' <<< "$rows" | sort -u); do
+            file="$LOGS/$year.csv"
+            {
+                echo "$HEADER"
+                fold <(awk -v monday="$monday" -v year="$year" 'substr($0, 1, 10) < monday && substr($0, 1, 4) == year' <<< "$rows") \
+                    "$([ -r "$file" ] && echo "$file" || echo /dev/null)"
+            } > "$file.tmp" && mv "$file.tmp" "$file"
+        done
+        for i in "${!claims[@]}"; do
+            put_back "${claims[i]}" $(( sizes[i] + 1 ))
+            rm -f "${claims[i]}"
+        done
+    fi
+    rmdir "$LOGS/.rolling.lock"
 }
 
 
@@ -404,22 +518,27 @@ ask() {
 
 # <since>: the session and work last in focus before a moment, as the records
 # hold them, so they can be written again as they are. A spell can begin just
-# after a month does, so the month before is looked through too.
+# after a week, a month or a year does, so the files before are looked through too.
 last_focus() {
-    local before month file line best="" found=""
+    local before month file files=()
     before=$(stamp "$1")
     for month in "$(date -d "$(printf '%(%Y-%m-01)T' "$1") -1 day" +%Y-%m)" "$(printf '%(%Y-%m)T' "$1")"; do
-        file="$LOGS/$month.csv"
-        [[ -r "$file" ]] || continue
-        # an answer is written long after the spell it fills, so the file isn't in time order
-        while IFS= read -r line; do
-            [[ "${line:25:7}" == ",focus," ]] || continue
-            [[ "${line:0:25}" > "$before" || "${line:0:25}" < "$best" ]] && continue
-            best=${line:0:25}
-            found=${line:32}
-        done < "$file"
+        for file in "$LOGS/$month.csv" "$LOGS/${month:0:4}.csv"; do
+            [[ -r "$file" ]] && files+=("$file")
+        done
     done
-    [[ -n "$found" ]] && echo "$found"
+    for file in "$LOGS/week.csv" "$LOGS"/.rolling.*.csv; do
+        [[ -r "$file" ]] && files+=("$file")
+    done
+    (( ${#files[@]} )) || return 1
+    # an answer is written long after the spell it fills, so no file is in time order
+    awk -v before="$before" '
+        substr($0, 26, 7) == ",focus," && substr($0, 1, 25) <= before && substr($0, 1, 25) >= best {
+            best = substr($0, 1, 25)
+            found = substr($0, 33)
+        }
+        END { if (found == "") exit 1; print found }
+    ' "${files[@]}"
 }
 
 # <since> <session> <answer>: where the time since a quiet spell began went. It is
@@ -500,6 +619,10 @@ case "$ACTION" in
 
     topic)
         topic "$1"
+        ;;
+
+    roll)
+        roll
         ;;
 
     ""|--help|-h|help)

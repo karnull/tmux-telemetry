@@ -97,3 +97,32 @@ func TestDirPrefersTelemetryDir(t *testing.T) {
 		t.Errorf("got %s", got)
 	}
 }
+
+func TestLoadAcrossWeekYearsAndMonths(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("timestamp,event,session,context\n"+body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("2025-12.csv", "2025-12-31T17:00:00+11:00,focus,A,december\n")
+	write("2026.csv", "2026-01-01T09:00:00+11:00,focus,A,january\n"+
+		"2026-11-13T09:00:00+11:00,focus,B,last week\n")
+	write("week.csv", "2026-11-17T09:00:00+11:00,focus,C,this week\n")
+	// a roll cut short has moved the week aside and already written the year
+	write(".rolling.4242.csv", "2026-11-13T09:00:00+11:00,focus,B,last week\n"+
+		"2026-11-16T09:00:00+11:00,focus,C,monday\n")
+
+	day := func(y int, m time.Month, d int) Date { return time.Date(y, m, d, 0, 0, 0, 0, time.UTC) }
+	got, err := Load(dir, day(2025, 12, 31), day(2026, 11, 17))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var contexts []string
+	for _, rec := range got.Records {
+		contexts = append(contexts, rec.Context)
+	}
+	if want := "december january last week monday this week"; strings.Join(contexts, " ") != want {
+		t.Errorf("got %q, want %q", strings.Join(contexts, " "), want)
+	}
+}

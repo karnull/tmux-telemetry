@@ -56,12 +56,13 @@ func Answer(at time.Time, session, context, where string) (Record, bool) {
 
 var eventNames = map[Event]string{Focus: "focus", Away: "away", Lunch: "lunch", AFK: "afk", Idle: "idle", Topic: "topic"}
 
-// Append adds a record to its month's file, as the plugin would have written it.
+// Append adds a record to the week's file, as the plugin would have written it;
+// the plugin moves it to its year's file once its week is over.
 func Append(dir string, rec Record) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	path := filepath.Join(dir, rec.Time.Format("2006-01")+".csv")
+	path := filepath.Join(dir, "week.csv")
 	info, err := os.Stat(path)
 	fresh := err != nil || info.Size() == 0
 
