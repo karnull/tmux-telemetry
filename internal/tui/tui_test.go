@@ -79,7 +79,7 @@ func press(m Model, keys ...string) Model {
 func TestSummaryShowsTheWeek(t *testing.T) {
 	m := newModel(t)
 	view := m.View().Content
-	for _, want := range []string{"Week 46", "Roblox", "release-1.0", "2:00"} {
+	for _, want := range []string{"Week 46", "Roblox", "release-1.0", "2:00", "Averages", "Start  09:00", "Leave  11:00"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("summary is missing %q:\n%s", want, view)
 		}
