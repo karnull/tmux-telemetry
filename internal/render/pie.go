@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
 
 	"github.com/karnull/tmux-telemetry/internal/sheet"
 )
@@ -120,7 +121,8 @@ func PieWithLegend(t Theme, sessions []sheet.Total, averages sheet.Averages, rad
 	return lipgloss.JoinHorizontal(lipgloss.Center, pie, "    ", side)
 }
 
-// Averages lists the typical day, to sit beside the pie.
+// Averages lists the typical day in a table of its own, so it stands apart
+// from the pie beside it.
 func Averages(t Theme, a sheet.Averages) string {
 	value := func(has bool, s string) string {
 		if !has {
@@ -128,11 +130,12 @@ func Averages(t Theme, a sheet.Averages) string {
 		}
 		return fmt.Sprintf("%5s", s)
 	}
-	return strings.Join([]string{
-		t.bold("Averages"),
-		"Start  " + value(a.Has.Start, sheet.Clock(a.Start)),
-		"Leave  " + value(a.Has.Start, sheet.Clock(a.Leave)),
-		"Lunch  " + value(a.Has.Lunch, sheet.Hours(a.Lunch)),
-		"AFK    " + value(a.Has.AFK, sheet.Hours(a.AFK)),
-	}, "\n")
+	return newTable(t).
+		Headers("Averages", "").
+		Row("Start", value(a.Has.Start, sheet.Clock(a.Start))).
+		Row("Leave", value(a.Has.Start, sheet.Clock(a.Leave))).
+		Row("Lunch", value(a.Has.Lunch, sheet.Hours(a.Lunch))).
+		Row("AFK", value(a.Has.AFK, sheet.Hours(a.AFK))).
+		StyleFunc(func(row, _ int) lipgloss.Style { return cellStyle(t, row == table.HeaderRow) }).
+		String()
 }

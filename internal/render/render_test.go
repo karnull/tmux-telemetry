@@ -50,13 +50,10 @@ func TestAveragesSitBesideTheLegendWhenThereIsRoom(t *testing.T) {
 	averages := sheet.Averages{Start: 9*time.Hour + 10*time.Minute, Leave: 17*time.Hour + 55*time.Minute, AFK: 10 * time.Minute}
 	averages.Has.Start, averages.Has.AFK = true, true
 	wide := PieWithLegend(theme, sessions, averages, 6, 100)
-	for _, want := range []string{"Start  09:10", "Leave  17:55", "AFK     0:10"} {
+	for _, want := range []string{"| Start    | 09:10 |", "| Leave    | 17:55 |", "| Lunch    |     - |", "| AFK      |  0:10 |"} {
 		if !strings.Contains(wide, want) {
 			t.Errorf("missing %q:\n%s", want, wide)
 		}
-	}
-	if !strings.Contains(wide, "Lunch      -") {
-		t.Errorf("no lunch should show as -:\n%s", wide)
 	}
 	if narrow := PieWithLegend(theme, sessions, averages, 6, 40); lipgloss.Width(narrow) > 40 || !strings.Contains(narrow, "Averages") {
 		t.Errorf("in 40 columns the averages should go under the legend:\n%s", narrow)
