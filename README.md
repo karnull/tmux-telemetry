@@ -190,9 +190,9 @@ status 2, and any other failure with 1. `timesheet completion zsh` (or `bash`,
   just above AFK and the other breaks.
 * The totals table keeps each session's rows together, the sessions longest first
   and their work longest first within each.
-* Beside the pie chart, the averages give the typical day: when work started
-  and stopped, from the first and last work of each day that had some; lunch,
-  over the days with a lunch break; and AFK, over every day.
+* Beside the pie chart, a table of averages gives the typical day: when work
+  started and stopped, from the first and last work of each weekday that had
+  some; lunch, over the days with a lunch break; and AFK, over every day.
 * AFK, lunch breaks and UNATTENDED time show in the totals table, the timetables
   and the timeline, AFK as a faint `z`, lunch as faint dots and UNATTENDED as
   faint question marks, but are left out of each session's total, the pie chart
