@@ -11,13 +11,13 @@ type Averages struct {
 }
 
 // Average works out the typical day. Start and leave are the first and last
-// counted work of each day that had some; lunch is over the days with a lunch
+// counted work of each weekday that had some, as weekends keep other hours; lunch is over the days with a lunch
 // break, so a day without one doesn't shorten it; AFK is over every day.
 func Average(days []Day) Averages {
 	var a Averages
 	var worked, lunched int
 	for _, d := range days {
-		if start, leave, ok := d.Span(); ok {
+		if start, leave, ok := d.Span(); ok && !weekend(d.Date) {
 			a.Start += start
 			a.Leave += leave
 			worked++
@@ -42,6 +42,10 @@ func Average(days []Day) Averages {
 		a.Has.AFK = true
 	}
 	return a
+}
+
+func weekend(date time.Time) bool {
+	return date.Weekday() == time.Saturday || date.Weekday() == time.Sunday
 }
 
 // Span is when the day's counted work began and when it ended.

@@ -31,6 +31,19 @@ func TestAverage(t *testing.T) {
 		t.Errorf("AFK over all three days: got %s", Hours(got.AFK))
 	}
 
+	// Saturday and Sunday keep other hours, so they leave start and leave as they were
+	weekend := []Day{
+		{Date: time.Date(2026, 11, 13, 0, 0, 0, 0, time.UTC), Entries: []Entry{{Work: work, Start: at(9, 0), End: at(17, 0)}}},
+		{Date: time.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC), Entries: []Entry{{Work: work, Start: at(13, 0), End: at(15, 0)}}},
+		{Date: time.Date(2026, 11, 15, 0, 0, 0, 0, time.UTC), Entries: []Entry{{Work: breakWork(LunchBreak), Start: at(12, 0), End: at(13, 0)}}},
+	}
+	if got := Average(weekend); got.Start != at(9, 0) || got.Leave != at(17, 0) || !got.Has.Lunch || got.Lunch != time.Hour {
+		t.Errorf("weekends: got start %s, leave %s and lunch %s", Clock(got.Start), Clock(got.Leave), Hours(got.Lunch))
+	}
+	if onlyWeekend := Average(weekend[1:2]); onlyWeekend.Has.Start {
+		t.Errorf("a weekend alone has no start or leave, got %+v", onlyWeekend)
+	}
+
 	if none := Average(nil); none.Has.Start || none.Has.Lunch || none.Has.AFK {
 		t.Errorf("no days should have no averages, got %+v", none)
 	}
