@@ -65,19 +65,24 @@ printf '%s\n' 'timestamp,event,session,context' '2001-08-31T23:58:00+00:00,focus
 check "carry on from a year rolled over" "$(rows | tail -n 1)" '2001-09-01T00:00:01+00:00,focus,Cyberpunk,rolled'
 rm -rf "$TELEMETRY_DIR"
 
-# quiet in a window already named afk or lunch asks nothing, as nobody is there,
-# and nor does it in a meeting, which says where the time is going
+# quiet on a break asks nothing, as nobody is there, and nor does it in a
+# meeting, which says where the time is going
 export TELEMETRY_TICK=1 TELEMETRY_IDLE_AFTER=3
-for away in "Work afk" "Work Lunch" "<Work> notes" "[Work] notes"; do
-    tmux -f /dev/null new-session -d -s "${away% *}" -n "${away#* }"
+for away in "afk Work" "lunch Work" "- <Work>" "- [Work]"; do
+    tmux -f /dev/null new-session -d -s "${away#* }"
     tmux run-shell "$ROOT/telemetry.tmux"
-    python3 - <<'PY'
-import os, pty, select, time
+    python3 - "${away% *}" <<'PY'
+import os, pty, select, sys, time
 pid, fd = pty.fork()
 if pid == 0:
     os.execvp("tmux", ["tmux", "attach"])
 start = time.time()
+# prefix \ and | take AFK and lunch
+key = {"afk": b"\x02\\", "lunch": b"\x02|"}.get(sys.argv[1])
 while time.time() < start + 6:
+    if key and time.time() > start + 1:
+        os.write(fd, key)
+        key = None
     if select.select([fd], [], [], 0.2)[0]:
         try:
             os.read(fd, 65536)
@@ -85,6 +90,10 @@ while time.time() < start + 6:
             break
 PY
     [ -e "$TELEMETRY_DIR/.asked" ] && { echo "idle: $away should not be asked about"; failed=1; }
+    if [[ "${away% *}" != - ]] && ! grep -q ",${away% *},," "$TELEMETRY_DIR"/week.csv; then
+        echo "idle: prefix should have started ${away% *}"
+        failed=1
+    fi
     tmux kill-server
     sleep 2
     rm -rf "$TELEMETRY_DIR"

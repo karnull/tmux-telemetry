@@ -57,14 +57,21 @@ step switch-client -t Work
 # a window named for a meeting is only a name now; the meeting keys say when one is on
 step rename-window -t Work: MEETING
 step rename-window -t Work: '!Meeting'
+# and so is a window named for a break; prefix \ and | take one instead
 step rename-window -t Work: afk
 step rename-window -t Work: Lunch
 step rename-window -t Work: notes
-# prefix m and M start and end a project meeting and an external one
 client=$(tmux list-clients -F '#{client_name}' | head -n 1)
 press() { tmux send-keys -K -c "$client" C-b "$1"; sleep 1; }
-# ending an external meeting asks what it was about, in a popup typed into as a client is
+# a popup is typed into as a client is
 answer() { tmux send-keys -K -c "$client" "$@"; sleep 1; }
+press '\'
+# a prompt behind the overlay is no sign anyone is back
+step send -t Work 'true' Enter
+answer x
+press '|'
+answer Enter
+# prefix m and M start and end a project meeting and an external one
 press m
 press M
 external=$(tmux list-sessions -F '#{session_name}' | sort | xargs)
@@ -82,6 +89,7 @@ step send -t Work 'true' Enter
 step detach-client -s Work
 
 actual=$(cut -d, -f 2- "$TELEMETRY_DIR"/*.csv | uniq)
+behind=$(awk -F, '$2 == "afk" { on = 1; next } $2 == "lunch" { on = 0 } on' "$TELEMETRY_DIR"/*.csv | wc -l)
 expected=$(printf '%s\n' \
     'event,session,context' \
     'focus,Work,feat/test' \
@@ -91,6 +99,7 @@ expected=$(printf '%s\n' \
     'focus,Other,' \
     'focus,Work,feat/test' \
     'afk,,' \
+    'focus,Work,feat/test' \
     'lunch,,' \
     'focus,Work,feat/test' \
     'focus,Work,Meeting' \
@@ -105,6 +114,11 @@ expected=$(printf '%s\n' \
 
 if [ "$external" != "[Other] [Work] [popup]" ]; then
     echo "record: an external meeting should mark every session, got $external"
+    exit 1
+fi
+
+if [ "$behind" != 1 ]; then
+    echo "record: only the key ending AFK should log focus, got $behind records"
     exit 1
 fi
 

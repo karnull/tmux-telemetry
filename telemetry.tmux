@@ -19,5 +19,11 @@ external_key=$(tmux show-option -gqv @telemetry-external-key)
 tmux bind-key "${meeting_key:-m}" run-shell -b "$TELEMETRY meeting #{pane_id}"
 tmux bind-key "${external_key:-M}" run-shell -b "$TELEMETRY external #{pane_id}"
 
+# prefix \ and |, unless set otherwise, cover the screen for AFK or lunch until a key is pressed
+afk_key=$(tmux show-option -gqv @telemetry-afk-key)
+lunch_key=$(tmux show-option -gqv @telemetry-lunch-key)
+tmux bind-key "${afk_key:-\\}" run-shell -b "$TELEMETRY break afk #{client_name}"
+tmux bind-key "${lunch_key:-|}" run-shell -b "$TELEMETRY break lunch #{client_name}"
+
 # the watcher has a session of its own, so it outlives tmux long enough to say when it stopped
 TELEMETRY_SOCKET=$(tmux display-message -p '#{socket_path}') setsid "$TELEMETRY" watch > /dev/null 2>&1 < /dev/null &
