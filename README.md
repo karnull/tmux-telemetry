@@ -11,9 +11,16 @@ log nothing. Detaching tmux counts as away.
 
 Rename a window to say what the time is going on, and that goes down in place of
 the branch, whatever the pane shows. Bench, Research and Hardware are the names,
-in any case. Windows named `lunch` and `afk` record a lunch break and time away,
-which belong to no session. timesheet lists them but leaves them out of every
-total.
+in any case.
+
+### Breaks
+
+Prefix `\` steps away from the keyboard and prefix `|` goes to lunch. Either
+covers the whole screen with AFK or LUNCH until any key is pressed, which ends
+the break and goes back to whatever is in focus. Breaks belong to no session:
+timesheet lists them but leaves them out of every total. Nothing behind the
+overlay, such as a command finishing at a prompt, counts as being back.
+`@telemetry-afk-key` and `@telemetry-lunch-key` choose other keys.
 
 ### Meetings
 
@@ -40,8 +47,7 @@ AFK instead.
 ### Quiet spells
 
 After `@telemetry-idle` minutes with no key pressed in tmux, a popup asks whether
-anyone is still there, unless the window in focus is named `afk` or `lunch` or a
-meeting is on. No, or no answer in two minutes, records the time since
+anyone is still there, unless a break or a meeting is on. No, or no answer in two minutes, records the time since
 the last key as UNATTENDED. On coming back, a second popup asks where you were:
 `a` for AFK, `e` for an external meeting, recorded under External and asked what
 it was about, `p` for a
@@ -95,6 +101,8 @@ build it with `make build`, which needs Go 1.26 or later.
 | `@telemetry-restart`      | `15`                      | minutes a gap can last and still be a restart, recorded as AFK      |
 | `@telemetry-meeting-key`  | `m`                       | prefix key that starts and ends a project meeting                   |
 | `@telemetry-external-key` | `M`                       | prefix key that starts and ends an external meeting                 |
+| `@telemetry-afk-key`      | `\`                       | prefix key that starts AFK, until any key is pressed                |
+| `@telemetry-lunch-key`    | `\|`                      | prefix key that starts lunch, until any key is pressed              |
 
 The records go to `$XDG_STATE_HOME/telemetry`, or to `$TELEMETRY_DIR` when set.
 
@@ -120,7 +128,7 @@ timestamp,event,session,context
 | Column      | What it holds                                                                                                                                                                                               |
 |-------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `timestamp` | RFC 3339, with the offset                                                                                                                                                                                   |
-| `event`     | `focus` when a pane gains focus or shows a prompt, `away` on detach, `lunch` and `afk` for those windows and a restart, `idle` for a quiet spell, `topic` for what an external meeting begun then was about |
+| `event`     | `focus` when a pane gains focus or shows a prompt, `away` on detach, `lunch` and `afk` for a break and a restart, `idle` for a quiet spell, `topic` for what an external meeting begun then was about |
 | `session`   | the tmux session                                                                                                                                                                                            |
 | `context`   | the window's label; else the git branch; the folder name on the trunk; the folder outside git; empty at home                                                                                                |
 

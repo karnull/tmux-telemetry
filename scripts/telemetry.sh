@@ -26,8 +26,7 @@ cat <<'EOF'
 Usage: telemetry [action]
 
 Actions:
-  record <PANE>   log the session, and the window's label or else the branch or folder;
-                  a window named lunch or afk logs a break, with no session
+  record <PANE>   log the session, and the window's label or else the branch or folder
   away            log that tmux was detached
   watch           keep watch while tmux runs: a gap from a restart goes down as
                   AFK, and the day ends when tmux or the machine stops
@@ -42,6 +41,10 @@ Actions:
   external <PANE> start or end an external meeting, which marks every session;
                   ending one asks what it was about
   topic <SINCE>   in a popup, ask what the external meeting begun then was about
+  break <afk|lunch> <CLIENT>
+                  log a break, and cover the client's screen until a key is pressed
+  overlay <afk|lunch> <CLIENT>
+                  runs in the break's popup: show it, and end it on any key
   roll            add the weeks before this one to their year files, with repeated
                   records folded together; the first record of a week does this
 
@@ -148,14 +151,8 @@ record_pane() {
     unmark name "$session"
 
     [[ "$active" == 1 && -n "$name" && " $ignore " != *" $name "* ]] || return 0
-
-    # lunch and time away belong to no project, so they go down without the session
-    case "${window,,}" in
-        lunch|afk)
-            append "${window,,}" "" ""
-            return
-            ;;
-    esac
+    # a prompt behind the break's overlay is no sign anyone is back
+    on_break && return 0
 
     # an external meeting belongs to no project, so it goes down as a session of its own
     case "$session" in
@@ -377,6 +374,78 @@ toggle_external() {
 
 
 #-------------------------------------------------------------------------------
+# breaks
+
+# A break covers the whole screen until a key is pressed. While its overlay is up,
+# .break holds its pid, so nothing behind it is taken for someone coming back.
+
+# whether a break's overlay is up; one gone without tidying up, as when the
+# machine was turned off, is no break
+on_break() {
+    local pid
+    read -r pid 2>/dev/null < "$LOGS/.break" || return 1
+    if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null && [[ "$(command_of "$pid")" == *"$(basename "$SELF") overlay"* ]]; then
+        return 0
+    fi
+    rm -f "$LOGS/.break"
+    return 1
+}
+
+# <afk|lunch> <client>: the break belongs to no project, so it goes down without a session
+start_break() {
+    [[ "$1" == afk || "$1" == lunch ]] || return 0
+    on_break && return 0
+    append "$1" "" ""
+    tmux display-popup -c "$2" -B -E -x 0 -y 0 -w 100% -h 100% -e "TELEMETRY_DIR=$LOGS" \
+        "$(printf '%q ' "$SELF" overlay "$1" "$2")"
+}
+
+# block letters, five rows each, for the words a break shows
+glyph() {
+    case "$1" in
+        A) GLYPH=(" ███ " "█   █" "█████" "█   █" "█   █") ;;
+        C) GLYPH=(" ████" "█    " "█    " "█    " " ████") ;;
+        F) GLYPH=("█████" "█    " "████ " "█    " "█    ") ;;
+        H) GLYPH=("█   █" "█   █" "█████" "█   █" "█   █") ;;
+        K) GLYPH=("█   █" "█  █ " "███  " "█  █ " "█   █") ;;
+        L) GLYPH=("█    " "█    " "█    " "█    " "█████") ;;
+        N) GLYPH=("█   █" "██  █" "█ █ █" "█  ██" "█   █") ;;
+        U) GLYPH=("█   █" "█   █" "█   █" "█   █" " ███ ") ;;
+    esac
+}
+
+# <word>: the word in block letters, in the middle of the screen
+draw_word() {
+    local word=${1^^} rows=("" "" "" "" "") i row lines cols
+    for (( i = 0; i < ${#word}; i++ )); do
+        glyph "${word:i:1}"
+        for row in 0 1 2 3 4; do
+            rows[row]+="${GLYPH[row]}  "
+        done
+    done
+    read -r lines cols < <(stty size 2>/dev/null)
+    printf '\e[2J\e[?25l'
+    for row in 0 1 2 3 4; do
+        printf '\e[%d;%dH%s' $(( (${lines:-24} - 5) / 2 + row + 1 )) $(( (${cols:-80} - ${#rows[row]} + 2) / 2 + 1 )) "${rows[row]% }"
+    done
+}
+
+# <afk|lunch> <client>: runs in the popup. Any key ends the break, and whatever is
+# in focus then goes down, so the break ends now rather than at the next prompt.
+overlay() {
+    local key
+    echo $$ > "$LOGS/.break"
+    trap 'draw_word "$1"' WINCH
+    trap 'rm -f "$LOGS/.break"' EXIT
+    draw_word "$1"
+    # a resize interrupts the wait, so it waits again
+    until read -rsn1 key; do :; done
+    rm -f "$LOGS/.break"
+    record_pane "$(tmux display-message -p -c "$2" '#{pane_id}')"
+}
+
+
+#-------------------------------------------------------------------------------
 # watching
 
 # <from> <to>: nothing ran between the two, as the machine was off or asleep, or
@@ -455,19 +524,14 @@ latest_keypress() {
 }
 
 # <now>: after @telemetry-idle minutes without a key pressed, 5 unless set, ask
-# whether anyone is there, once for each quiet spell. A window named afk or lunch
-# already says nobody is, and a meeting says where the time is going, so there is
-# nothing to ask.
+# whether anyone is there, once for each quiet spell. A break already says nobody
+# is, and a meeting says where the time is going, so there is nothing to ask.
 check_quiet() {
-    local now=$1 after activity client session window idle
+    local now=$1 after activity client session idle
+    on_break && return 0
     idle=$(option idle)
     after=${TELEMETRY_IDLE_AFTER:-$(( ${idle:-5} * 60 ))}
-    IFS=$'\t' read -r activity client session window < <(latest_keypress) || return 0
-    case "${window,,}" in
-        afk|lunch)
-            return 0
-            ;;
-    esac
+    IFS=$'\t' read -r activity client session _ < <(latest_keypress) || return 0
     [[ "$session" == "<"?*">" || "$session" == "["?*"]" ]] && return 0
     (( now - activity >= after )) || return 0
     [[ "$(cat "$LOGS/.asked" 2>/dev/null)" == "$activity" ]] && return 0
@@ -623,6 +687,14 @@ case "$ACTION" in
 
     roll)
         roll
+        ;;
+
+    break)
+        start_break "$1" "$2"
+        ;;
+
+    overlay)
+        overlay "$1" "$2"
         ;;
 
     ""|--help|-h|help)
