@@ -166,7 +166,12 @@ record_pane() {
             ;;
     esac
 
-    context=$(label "$window" "$labels") || context=$(work "$path" "$trunk")
+    # work in Internal is whatever the window is named, wherever the pane is
+    if [[ "${name,,}" == internal ]]; then
+        context=$(label "$window" "$labels") || context=$window
+    else
+        context=$(label "$window" "$labels") || context=$(work "$path" "$trunk")
+    fi
     append focus "$name" "$context"
 }
 

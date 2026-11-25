@@ -13,6 +13,10 @@ Rename a window to say what the time is going on, and that goes down in place of
 the branch, whatever the pane shows. Bench, Research and Hardware are the names,
 in any case.
 
+A session named Internal, in any case, records the window's name as its work in
+place of the branch or folder, wherever its panes are. A meeting there still goes
+down as one.
+
 ### Breaks
 
 Prefix `\` steps away from the keyboard and prefix `|` goes to lunch. Either
