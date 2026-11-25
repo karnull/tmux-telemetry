@@ -82,6 +82,15 @@ press M
 press M
 # answered once the meeting is over, so written after, but dated to its start
 answer p l a n n i n g Enter
+# Internal, in any case, records the window's name as its work, wherever the pane is
+step new-session -d -s internal -n roadmap -c "$SCRATCH/repo" zsh
+step switch-client -c "$client" -t internal
+step send -t internal 'cd /' Enter
+step rename-window -t internal: research
+# a meeting there is still a meeting
+press m
+press m
+step switch-client -c "$client" -t Work
 # a trunk set with no ignore list must still be read as the trunk
 step set -gu @telemetry-ignore
 step set -g @telemetry-trunk feat/test
@@ -109,6 +118,11 @@ expected=$(printf '%s\n' \
     'focus,External,Meeting' \
     'focus,Work,feat/test' \
     'topic,External,planning' \
+    'focus,internal,roadmap' \
+    'focus,internal,Research' \
+    'focus,internal,Meeting' \
+    'focus,internal,Research' \
+    'focus,Work,feat/test' \
     'focus,Work,repo' \
     'away,,')
 
